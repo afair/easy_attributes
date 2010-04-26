@@ -1,6 +1,39 @@
 = easy_attributes
 
-Description goes here.
+Easy Attributes is a Ruby DSL to give more control to attributes.
+
+== Usage
+
+Configuration:
+  EasyAttributes::Config.orm = :active_model   # will generate some validations, etc.
+  EasyAttributes::Config.load(filename)        # Loads a file of column/value/names/descriptions
+  EasyAttributes::define(attribute_name, {:name=>value, ...})
+
+Declaration:
+
+ class Record < ObjectRelationalMapperOfChoice
+   include EasyAttributes
+   
+   attr_values :field, :name=>'value', :name=>'value', ... :validate=>:active_record, :required=>true, :like=>'other' ...
+   attr_sequence  :field, :name, :name, ... ,:start=>1, :step=>1
+   attr_cents  :amount, :units=>"dollars", :unit=>'$', :negative=>'%.2f CR'
+ end
+ 
+attr_values will define:
+  field()              # => value
+  field=(:name)        # => value
+  field_sym()          # => :name
+  field_values()       # => {:name=>value, ...}
+  field_is?(:name)     # true if :name matches current value
+  field_is?(:name, :name, ...)  # true if value matches a given symbol
+  field_is?(:greater_than, :name) # true if the value is greater than the value of :name
+    The first argument can be one of: 
+    :greater_than, :gt, :greater_than_or_equal, :ge, :less_than, :lt, :less_than_or_equal, :le
+  field_is?(:between, :name1, :name2) # true if the value is between the corresponding values
+
+attr_sequence sets up a attr_values with the sequential numbering, by default starting at 1 incrementing by 1
+
+attr_cents adds in easy_money functionality
 
 == Note on Patches/Pull Requests
  

@@ -6,7 +6,7 @@ begin
   Jeweler::Tasks.new do |gem|
     gem.name = "easy_attributes"
     gem.summary = %Q{Easy Attributes for Ruby}
-    gem.description = %Q{Easy Attributes for Ruby}
+    gem.description = %Q{Easy Attributes is a Ruby DSL to give more control to attributes.}
     gem.email = "allen.fair@gmail.com"
     gem.homepage = "http://github.com/afair/easy_attributes"
     gem.authors = ["Allen Fair"]

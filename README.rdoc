@@ -1,6 +1,6 @@
 = easy_attributes
 
-Easy Attributes is a Ruby DSL to give more control to attributes.
+Easy Attributes is a Ruby DSL to give more control to attributes. Tested with ruby 1.87 & 1.9.2
 
 == Usage
 

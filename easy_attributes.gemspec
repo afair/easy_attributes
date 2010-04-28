@@ -5,12 +5,12 @@
 
 Gem::Specification.new do |s|
   s.name = %q{easy_attributes}
-  s.version = "0.0.0"
+  s.version = "0.1.0"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Allen Fair"]
-  s.date = %q{2010-02-26}
-  s.description = %q{Easy Attributes for Ruby}
+  s.date = %q{2010-04-28}
+  s.description = %q{Easy Attributes is a Ruby DSL to give more control to attributes.}
   s.email = %q{allen.fair@gmail.com}
   s.extra_rdoc_files = [
     "LICENSE",
@@ -23,6 +23,7 @@ Gem::Specification.new do |s|
      "README.rdoc",
      "Rakefile",
      "VERSION",
+     "easy_attributes.gemspec",
      "lib/easy_attributes.rb",
      "test/helper.rb",
      "test/test_easy_attributes.rb"

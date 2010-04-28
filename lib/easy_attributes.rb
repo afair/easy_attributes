@@ -48,10 +48,12 @@ module EasyAttributes
     
     # Loads a tab-delimted filename into the symbol table in format: 
     # attribute value role symbolic_name short_description long_description (useful for "<option>" data)
+    # If a block is given, it should parse a file line and return an array of 
+    # [attribute, value, role*, name, short*, long_description*], *denotes not required, but placeholder required
     def self.load(filename)
       File.open(filename).each do |r|
         next unless r =~ /^\w/
-        (col, val, priv, symbol, word, desc) = r.split(/\t/)
+        (col, val, priv, symbol, word, desc) = block_given? ? yield(r) : r.split(/\t/)
         next if desc.nil? || desc.empty? || symbol.empty? || word.empty? || symbol.nil?
         col = col.to_sym
         @@values[col] = {:sym=>{}, :val=>{}, :rec=>{}} unless @@values.has_key?(col)
@@ -87,30 +89,15 @@ module EasyAttributes
       name = "#{self.name}##{attribute}"
       EasyAttributes.add_definition( name, hash)
       code = ''
-      #code = hash.map {|k,v| "#{attribute.to_s.upcase}_#{k.to_s.upcase}=#{v.inspect}\n"}.join()
       if EasyAttributes::Config.orm == :active_model
         validates_inclusion_of attribute, :in=>hash.values
-        code += %Q(
-          def #{attribute}
-            self.attributes[:#{attribute}]
-          end
-          def #{attribute}=(v)
-            v = EasyAttributes.value_for_sym("#{name}", v) if v.is_a?(Symbol)
-            self.write_attribute(:#{attribute}, v)
-          end
-        )
       else
-        code += %Q(
-          def #{attribute}
-            @#{attribute}
-          end
-          def #{attribute}=(v)
-            v = EasyAttributes.value_for_sym("#{name}", v) if v.is_a?(Symbol)
-            @#{attribute} = v
-          end
-        )
+        attr_accessor attribute
       end
       code += %Q(
+        def #{attribute}_sym=(v)
+          self.#{attribute} = EasyAttributes.value_for_sym("#{name}", v)
+        end
         def #{attribute}_sym
           EasyAttributes.sym_for_value("#{name}", #{attribute})
         end
@@ -130,24 +117,22 @@ module EasyAttributes
     def attr_bytes(attribute, *args)
       name = "#{self.name}##{attribute}"
       opt = EasyAttributes.pop_options(args)
-      getter, setter = EasyAttributes.getter_setter(attribute)
+      #getter, setter = EasyAttributes.getter_setter(attribute)
       attr_accessor attribute if EasyAttributes::Config.orm == :attr
       code = %Q(
         def #{attribute}_bytes(*args)
-          v = #{getter}
-          args.size == 0 ? v : EasyAttributes::format_bytes(v, *args)
+          args.size == 0 ? v : EasyAttributes::format_bytes(self.#{attribute}, *args)
         end
         def #{attribute}_bytes=(v)
-          v = EasyAttributes.parse_bytes(v) unless v.is_a?(Fixnum)
-          #{setter}
+          self.#{attribute} = EasyAttributes.parse_bytes(v)
         end
       )
       #puts code
       class_eval code
     end
     
-    # Creates an money instance method for the given method, named "#{method}_money" which returns
-    # a formatted money string, and a #{method}_money= method used to set an edited money string.
+    # Creates an money instance method for the given method, named "#{attribute}_money" which returns
+    # a formatted money string, and a #{attribute}_money= method used to set an edited money string.
     # The original method stores the value as integer (cents, or other precision/currency setting). Options:
     # * :money_method - Use this as the alternative name to the money-access methods
     # * :units - Use this as an alternative suffix name to the money methods ('dollars' gives 'xx_dollars')
@@ -162,19 +147,19 @@ module EasyAttributes
     # * :blank - Return this value when the money string is empty or has no digits on assignment
     # * :negative_regex - A Regular Expression used to determine if a number is negative (and without a - sign)
     #
-    def attr_money(method, *args)
+    def attr_money(attribute, *args)
       opt = args.last.is_a?(Hash) ? args.pop : {}
-      money_method = opt.delete(:money_method) || "#{method}_#{opt.delete(:units)||'money'}"
+      money_method = opt.delete(:money_method) || "#{attribute}_#{opt.delete(:units)||'money'}"
 
       class_eval %Q(
       def #{money_method}(*args)
         opt = args.last.is_a?(Hash) ? args.pop : {}
-        EasyAttributes.integer_to_money( #{method}, #{opt.inspect}.merge(opt))
+        EasyAttributes.integer_to_money( #{attribute}, #{opt.inspect}.merge(opt))
       end
 
       def #{money_method}=(v, *args)
         opt = args.last.is_a?(Hash) ? args.pop : {}
-        self.#{method} = EasyAttributes.money_to_integer( v, #{opt.inspect}.merge(opt))
+        self.#{attribute} = EasyAttributes.money_to_integer( v, #{opt.inspect}.merge(opt))
       end
       )
     end
@@ -197,6 +182,10 @@ module EasyAttributes
   def self.add_definition(attribute, hash, opt={})
     EasyAttributes::Config.define attribute, hash
   end
+  
+  ##############################################################################
+  # attr_values helpers
+  ##############################################################################
   
   # Returns the defined value for the given symbol and attribute
   def self.value_for_sym(attribute, sym)
@@ -226,6 +215,10 @@ module EasyAttributes
       args.include? EasyAttributes.sym_for_value(v)
     end
   end
+  
+  ##############################################################################
+  # attr_byte helpers
+  ##############################################################################
 
   # Official Definitions for kilobyte and kibibyte quantity prefixes
   KB =1000; MB =KB **2; GB= KB **3; TB =KB **4; PB =KB **5; EB =KB **6; ZB =KB **7; YB =KB **8
@@ -284,6 +277,10 @@ module EasyAttributes
 	  (bytes*100).to_i/100
   end
   
+  ##############################################################################
+  # attr_money helpers
+  ##############################################################################
+  
   # Returns the money string of the given integer value. Uses relevant options from #easy_money
   def self.integer_to_money(value, *args)
     opt = args.last.is_a?(Hash) ? args.pop : {}
@@ -321,9 +318,9 @@ module EasyAttributes
   # Returns the integer of the given money string. Uses relevant options from #easy_money
   def self.money_to_integer(value, *args)
     opt = args.last.is_a?(Hash) ? args.pop : {}
-    value.gsub!(opt[:delimiter],'') if opt[:delimiter]
-    value.gsub!(opt[:separator],'.') if opt[:separator]
-    value.gsub!(/^[^\d\.\-\,]+/,'')
+    value = value.gsub(opt[:delimiter],'') if opt[:delimiter]
+    value = value.gsub(opt[:separator],'.') if opt[:separator]
+    value = value.gsub(/^[^\d\.\-\,]+/,'')
     return (opt[:blank]||nil) unless value =~ /\d/
     m = value.to_s.match(opt[:negative_regex]||/^(-?)(.+\d)\s*cr/i)
     value = value.match(/^-/) ? m[2] : "-#{m[2]}" if m && m[2]

@@ -3,8 +3,6 @@ module EasyAttributes
   
   def self.included(base) #:nodoc:
     base.extend( ClassMethods )
-    #EasyAttributes::Config
-    #puts "easy_attributes included into #{base}"
   end
   
   # Configuration class for EasyAttributes, set at load time.
@@ -91,6 +89,8 @@ module EasyAttributes
       code = ''
       if EasyAttributes::Config.orm == :active_model
         validates_inclusion_of attribute, :in=>hash.values
+        # Add named_scope (scope) for each value
+        hash.each { |k,v| code += "named_scope :#{k}, :conditions=>{:#{attribute}=>#{v.inspect}}\n" }
       else
         attr_accessor attribute
       end

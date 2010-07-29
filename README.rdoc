@@ -37,7 +37,7 @@ Declaration:
 
 will define:
   field()              # => value  ### if orm == :attr, attr_accessor will be installed for the attribute
-  field=(value)        # => value
+  field=(value)        # => value  ### for active_model classes
   field_sym()          # => :name
   field_sym=(symbol)   # => value
   field_values()       # => {:name=>value, ...}

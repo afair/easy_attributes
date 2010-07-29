@@ -21,6 +21,10 @@ class TestEasyAttributes < Test::Unit::TestCase
     self.tav_sym = :k2
     assert_equal tav, 2
     assert_equal tav_sym, :k2
+    assert_equal tav_is?(:k2), true
+    assert_equal tav_is?(:k1, :k3), false
+    #self.tav = :k1
+    #assert_equal tav, 1
   end
   
   def test_like

@@ -105,9 +105,16 @@ module EasyAttributes
           EasyAttributes::Config.attributes["#{name}"]
         end
         def #{attribute}_is?(*args)
-          EasyAttributes.value_is?("#{name}", attribute, *args)
+          EasyAttributes.value_is?("#{name}", #{attribute}, *args)
         end
       )
+      if EasyAttributes::Config.orm == :active_model
+        code += %Q(
+          def #{attribute}=(v)
+            self[:#{attribute}] = v.is_a?(Symbol) ? EasyAttributes.value_for_sym("#{attribute}", v) : v; 
+          end
+        )
+      end
       #puts code
       class_eval code
     end
@@ -195,6 +202,7 @@ module EasyAttributes
   # Returns the defined symbol for the given value on the attribute
   def self.sym_for_value(attribute, value)
     EasyAttributes::Config.attributes[attribute].each {|k,v| return k if v==value}
+    raise "EasyAttribute #{attribute} symbol not found for #{value}"
   end
   
   def self.value_is?(attribute, value, *args)
@@ -212,7 +220,7 @@ module EasyAttributes
     #when :not, :not_in
     #  ! args.include? EasyAttributes::Config.attributes[attribute].keys
     else
-      args.include? EasyAttributes.sym_for_value(v)
+      args.include? EasyAttributes.sym_for_value(attribute, value)
     end
   end
   

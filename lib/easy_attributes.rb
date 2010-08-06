@@ -44,6 +44,14 @@ module EasyAttributes
       @@attributes
     end
     
+    # Returns the value table: 
+    #   values[:name][:rec][:setting] = {:word, :description, :value}
+    #   values[:name][:sym][:setting] = value
+    #   values[:name][:value]["value"] = :symbol
+    def self.values
+      @@values
+    end
+    
     # Loads a tab-delimted filename into the symbol table in format: 
     # attribute value role symbolic_name short_description long_description (useful for "<option>" data)
     # If a block is given, it should parse a file line and return an array of 
@@ -57,7 +65,7 @@ module EasyAttributes
         @@values[col] = {:sym=>{}, :val=>{}, :rec=>{}} unless @@values.has_key?(col)
         @@values[col][:sym][symbol.to_sym] = val.to_i
         @@values[col][:val][val] = symbol.to_sym
-        @@values[col][:rec][symbol.to_sym] = {:word=>word, :description=>desc, :value=>val.to_i}
+        @@values[col][:rec][symbol.to_sym] = {:word=>word, :description=>desc.chomp, :value=>val.to_i}
         @@attributes[col.to_s] ||= {}
         @@attributes[col.to_s][symbol.to_sym] = val.to_i
       end
@@ -87,10 +95,10 @@ module EasyAttributes
       name = "#{self.name}##{attribute}"
       EasyAttributes.add_definition( name, hash)
       code = ''
-      if EasyAttributes::Config.orm == :active_model
+      if EasyAttributes::Config.orm == :active_model && opt[:scope]
         validates_inclusion_of attribute, :in=>hash.values
         # Add named_scope (scope) for each value
-        hash.each { |k,v| code += "named_scope :#{k}, :conditions=>{:#{attribute}=>#{v.inspect}}\n" }
+        hash.each { |k,v| code += "scope :#{k}, :conditions=>{:#{attribute}=>#{v.inspect}}\n" }
       else
         attr_accessor attribute
       end
@@ -111,7 +119,7 @@ module EasyAttributes
       if EasyAttributes::Config.orm == :active_model
         code += %Q(
           def #{attribute}=(v)
-            self[:#{attribute}] = v.is_a?(Symbol) ? EasyAttributes.value_for_sym("#{attribute}", v) : v; 
+            self[:#{attribute}] = v.is_a?(Symbol) ? EasyAttributes.value_for_sym("#{name}", v) : v; 
           end
         )
       end
@@ -196,11 +204,13 @@ module EasyAttributes
   
   # Returns the defined value for the given symbol and attribute
   def self.value_for_sym(attribute, sym)
-    EasyAttributes::Config.attributes[attribute][sym]
+    EasyAttributes::Config.attributes[attribute][sym] or 
+      raise "EasyAttributes #{attribute} value :#{sym} not declared"
   end
   
   # Returns the defined symbol for the given value on the attribute
   def self.sym_for_value(attribute, value)
+    return nil if value.nil?
     EasyAttributes::Config.attributes[attribute].each {|k,v| return k if v==value}
     raise "EasyAttribute #{attribute} symbol not found for #{value}"
   end

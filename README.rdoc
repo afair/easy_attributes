@@ -10,7 +10,7 @@ First, install this from rubygems.org
  gem install easy_attributes
 
 Next, you need to configure your app to use it, by either:
- require 'rubygems'                 # Rails application, no framework
+ require 'rubygems'                 # Ruby application, no framework
  require 'easy_attributes'          #
  
  config.gem 'easy_attributes'       # Rails 2.x, in your ./config/environment.rb

@@ -48,9 +48,17 @@ will define:
     :greater_than, :gt, :greater_than_or_equal, :ge, :less_than, :lt, :less_than_or_equal, :le
   field_is?(:between, :name1, :name2) # true if the value is between the corresponding values
 
-== attr_sequence 
+Options:
+  :scope=> true        # defines: scope :setting, where(:field=>value)
+  :naamed_scope=> true # defines: named_scope :setting, :conditions=>{:field=>value}
 
-sets up a attr_values with the sequential numbering, by default starting at 1 incrementing by 1
+== attr_enum 
+
+List all symbolic values in order with a given :start (default zero) and :step (default 1) option
+* Use nil as a placeholder to comsume an unused value
+* Reset the value for the next symbol by specifying an integer value in the sequence.
+
+  attr_enum :month, 1, :jan, 5, :apr, :may, nil, :jul, ..., :start=>1, :step=>1
 
 == attr_bytes
 

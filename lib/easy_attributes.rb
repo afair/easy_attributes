@@ -1,78 +1,101 @@
-# Mixes in attr_* definitions into ruby classes for using symbolic names as values, money, and bytes
+###############################################################################
+# EasyAttributes Module - Provides attribute handling enahancements. 
+#
+# Features include:
+#
+#  * Attribute Enum support, giving symbolic names for numeric or other values
+#    * Provides optional ActiveModel ORM enhancements for validations, etc.
+#  * Byte datatype helpers
+#  * Fixed-decimal datatype (e.g. Dollars) helpers
+#
+# To Use: 
+#
+#   * Require the easy_attributes gem if you need. 
+#   * Mix in the EasyAttributes module into your class.
+#   * Load any external enum definitions at application start-up
+#   * Define attribute enhancers  in your class
+#  
+#       require 'easy_attributes'
+#       class MyClass
+#         include EasyAttributes
+#         attr_enum :my_attribute, :zero, :one, :two
+#       end
+#
+###############################################################################
 module EasyAttributes
   
+  # Called by Ruby after including to add our ClassMethods to the parent class
   def self.included(base) #:nodoc:
-    base.extend( ClassMethods )
+    base.extend(ClassMethods)
   end
   
-  # Configuration class for EasyAttributes, set at load time.
+  # EasyAttributes::Config - Namespace to define and hold configuration data.
   class Config
-    @@orm = :attr # :attr, :active_model
-    @@attributes = {}
-    @@values = {}
-    @@kb_size=:iec
+    @orm        = :attr    # :attr, :active_model
+    @kb_size    = :iec     # :iec, :old, :new
+    @attributes = {}       # {attribute:{symbols:{symbol:value, ... },
+                           #             values: {value:symbol, ... },
+                           #             extras: {name:value,   ... }}, ... }
     
-    # Values: :old, :jedec, or 1024 uses KB=1024
-    #         :new, :iec            uses KiB=1024, no KB
-    #         1000, :decimal        uses only KB (1000) (other values mix KB and KiB units)
+    # Public: Set the default size for a kilobyte/kibibyte
+    #
+    # arg - How to represent kilobyte
+    #       :new, :iec            uses KiB=1024, no KB
+    #       :old, :jedec, or 1024 uses KB=1024
+    #       1000, :decimal        uses only KB (1000) (other values mix KB and KiB units)
+    #
+    # Examples
+    #
+    #   EasyAttributes::Config.kb_size = :iec
+    #
+    # Returns nothing
+    #
     def self.kb_size=(b)
-      @@kb_size = b
+      @kb_size = b
     end
     
     # Returns the kb_size setting
     def self.kb_size
-      @@kb_size
+      @kb_size
     end
     
     # Set the ORM or attribute manager, currently to :attr (attr_accessor) or :active_model
     def self.orm=(o)
-      @@orm = o
+      @orm = o
     end
     
     # Returns the ORM setting
     def self.orm
-      @@orm
+      @orm
     end
 
     # Defines a symbol name to a hash of :name=>value
     def self.define(name, hash)
-      @@attributes[name] = hash
+      @attributes[name] = hash
+    end
+
+    def self.define_value(attribute, symbol, value, extras={})
+      attribute = attribute.to_sym
+      symbol    = symbol.to_sym
+      unless @attributes.has_key?(attribute)
+        @attributes[attribute] = {}
+        @values[attribute] = {}
+        @extras[attribute] = {}
+      end
+      @attributes[attribute][symbol] = value
+      @values[attribute][value] = symbol
+      @extras[attribute][value] = extras unless extras.empty?
     end
     
     # Returns the symbol table
     def self.attributes
-      @@attributes
+      @attributes
     end
     
-    # Loads a tab-delimted filename into the symbol table in format: 
-    # attribute value role symbolic_name short_description long_description (useful for "<option>" data)
-    # If a block is given, it should parse a file line and return an array of 
-    # [attribute, value, role*, name, short*, long_description*], *denotes not required, but placeholder required
-    def self.load(filename)
-      File.open(filename).each do |r|
-        next unless r =~ /^\w/
-        (col, val, priv, symbol, word, desc) = block_given? ? yield(r) : r.split(/\t/)
-        next if desc.nil? || desc.empty? || symbol.empty? || word.empty? || symbol.nil?
-        col = col.to_sym
-        @@values[col] = {:sym=>{}, :val=>{}, :rec=>{}} unless @@values.has_key?(col)
-        @@values[col][:sym][symbol.to_sym] = val.to_i
-        @@values[col][:val][val] = symbol.to_sym
-        @@values[col][:rec][symbol.to_sym] = {:word=>word, :description=>desc, :value=>val.to_i}
-        @@attributes[col.to_s] ||= {}
-        @@attributes[col.to_s][symbol.to_sym] = val.to_i
-      end
     end
   end
   
   module ClassMethods
-    # Defines an attribute as a sequence of names. :name1=>1, :name2=>2, etc.
-    # attr_sequence :attr, :name, ... :start=>n, :step=>:n
-    def attr_sequence(attribute, *names)
-      opt = EasyAttributes.pop_options(names)
-      values = {}
-      names.inject(opt[:start]||1) { |seq, n| values[n]=seq; seq+=(opt[:step]||1)}
-      attr_values( attribute, values, opt)
-    end
     
     # Defines an attribute as a hash like {:key=>value,...} where key names are used interchangably with values
     def attr_values(attribute, *args)
@@ -82,7 +105,7 @@ module EasyAttributes
       # Use :like=>colname to copy from another definition (ClassName#attribute) or from the loaded table columns
       if opt[:like]
         hash = EasyAttributes::Config.attributes[opt[:like]]
-      end
+      nd
       
       name = "#{self.name}##{attribute}"
       EasyAttributes.add_definition( name, hash)
@@ -90,7 +113,12 @@ module EasyAttributes
       if EasyAttributes::Config.orm == :active_model
         validates_inclusion_of attribute, :in=>hash.values
         # Add named_scope (scope) for each value
-        hash.each { |k,v| code += "named_scope :#{k}, :conditions=>{:#{attribute}=>#{v.inspect}}\n" }
+        if opt[:named_scope]
+          hash.each { |k,v| code += "named_scope :#{k}, :conditions=>{:#{attribute}=>#{v.inspect}}\n" }
+        end
+        if opt[:scope]
+          hash.each { |k,v| code += "scope :#{k}, where({:#{attribute}=>#{v.inspect}})\n" }
+        end
       else
         attr_accessor attribute
       end
@@ -118,7 +146,32 @@ module EasyAttributes
       #puts code
       class_eval code
     end
-    
+
+    # Sets up a symbolic list of names for an enumerated value. First symbolic name is set to 0
+    # unless :start->n is specified. Use :step=>n to specify an increment value.
+    #   attr_enum :month, :jan, :feb, ..., :dec :start=>1, :step=>1
+    #   Use nil as a placeholder to comsume an unused value.
+    #   Reset the value in place by giving an int (42) used for the next symbol
+    def attr_enum(attribute, *args)
+      opt = args.size > 1 ? args.pop : {}
+      start = opt[:start] || 0
+      step = opt[:step] || 1
+      value=start
+      hash = {}
+      args.each do |sym|
+        case sym.class
+        when Symbol 
+          hash[sym] = value
+          value += step
+        when Fixnum
+          value = sym
+        when NilClass
+          value += step
+        end
+      end
+      attr_value( attribute, hash, opt )
+    end
+
     # attr_bytes allows manipultion and display as kb, mb, gb, tb, pb
     # Adds method: attribute_bytes=() and attribute_bytes(:unit, :option=>value )
     def attr_bytes(attribute, *args)

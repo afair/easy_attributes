@@ -1,4 +1,3 @@
-###############################################################################
 # EasyAttributes Module - Provides attribute handling enahancements. 
 #
 # Features include:
@@ -15,7 +14,11 @@
 #   * Load any external enum definitions at application start-up
 #   * Define attribute enhancers  in your class
 #  
+#   Gemfile (then `bundle install`):
+#       gem 'easy_attributes'
+#   Or manually
 #       require 'easy_attributes'
+#   Then
 #       class MyClass
 #         include EasyAttributes
 #         attr_enum :my_attribute, :zero, :one, :two
@@ -35,78 +38,193 @@ module EasyAttributes
     @kb_size    = :iec     # :iec, :old, :new
     @attributes = {}       # {attribute:{symbols:{symbol:value, ... },
                            #             values: {value:symbol, ... },
-                           #             extras: {name:value,   ... }}, ... }
+                           #             options:{name:value,   ... }}, ... }
     
     # Public: Set the default size for a kilobyte/kibibyte
-    #
-    # arg - How to represent kilobyte
+    #  Refer to: http://en.wikipedia.org/wiki/Binary_prefix
+    # 
+    # setting - How to represent kilobyte
     #       :new, :iec            uses KiB=1024, no KB
     #       :old, :jedec, or 1024 uses KB=1024
     #       1000, :decimal        uses only KB (1000) (other values mix KB and KiB units)
+    #       Note: "IEC" is the International Electrotechnical Commission
+    #             "JEDEC" is the Joint Electron Devices Engineering Council
     #
     # Examples
     #
     #   EasyAttributes::Config.kb_size = :iec
     #
-    # Returns nothing
+    # Returns new setting
     #
-    def self.kb_size=(b)
-      @kb_size = b
+    def self.kb_size=(setting)
+      @kb_size = setting
     end
     
-    # Returns the kb_size setting
+    # Public: Returns the current kb_size setting for use in computing Bytes
+    #
+    # Returns the current kb_size setting 
+    #
     def self.kb_size
       @kb_size
     end
     
-    # Set the ORM or attribute manager, currently to :attr (attr_accessor) or :active_model
-    def self.orm=(o)
-      @orm = o
+    # Public: Sets the ORM (Object Relational Mapper) to a supported policy
+    #
+    # new_orm - value 
+    #   :attr = attr_accessor style operations
+    #   :acitve_model = Rails ActiveModel operations
+    #
+    # Returns the new ORM setting
+    #
+    def self.orm=(new_orm)
+      @orm = new_orm
     end
     
-    # Returns the ORM setting
+    # Public: Returns the current ORM setting
+    #
+    # Returns the current ORM setting
+    #
     def self.orm
       @orm
     end
 
-    # Defines a symbol name to a hash of :name=>value
-    def self.define(name, hash)
-      @attributes[name] = hash
+    # Public: Create an attrbiute definition
+    #
+    # attrib  - name of the attribute or database column
+    # symbols - Hash of {symbol:value,...} for the attribute
+    # options - Hash of {name:value,...} to track for the attribute. Optional.
+    #
+    # Examples
+    #
+    #   EasyAttributes::Config.define_attribute :status, active:1, inactive:2
+    #   EasyAttributes::Config.define_attribute :status, {active:1, inactive:2}
+    #     active:{name:"Active"}, inactive:{name:"Inactive}
+    #
+    # Returns the attribute definition structure
+    #
+    def self.define_attribute(attrib, symbols, options={})
+      symbols = Hash[* symbols.collect {|k,v| [k.to_sym, v]}.flatten]
+      values  = Hash[* symbols.collect {|k,v| [v, k]}.flatten]
+      options = Hash[* options.collect  {|k,v| [k.to_sym, v]}.flatten]
+      @attributes[attrib.to_sym] = {symbols:symbols, values:values, options:options}
     end
 
-    def self.define_value(attribute, symbol, value, extras={})
-      attribute = attribute.to_sym
-      symbol    = symbol.to_sym
-      unless @attributes.has_key?(attribute)
-        @attributes[attribute] = {}
-        @values[attribute] = {}
-        @extras[attribute] = {}
+    # Public: Defines an Attribute/Symbol/Value tuple
+    #
+    # attrib  - name of the attribute or database column
+    # symbol  - internal symbolic name for the value
+    # value   - Value to store in class or database
+    # options - Hash of {name:value,...} to track for the symbol. Optional.
+    #
+    # Examples
+    #
+    #   EasyAttributes::Config.define_value :status, :active, 1
+    #   EasyAttributes::Config.define_value :status, :active, 1, name:"Active"
+    #
+    # Returns nothing
+    def self.define_value(attrib, symbol, value, options={})
+      attrib = attribute.to_sym
+      symbol = symbol.to_sym
+      @attributes[attrib] = {symbols:{}, values:{}, options:{}} unless @attributes.has_key?(attrib)
+      @attributes[attrib][:symbols][symbol] = value
+      @attributes[attrib][:values][value] = symbol
+      @attributes[attrib][:options] = options
+    end
+
+    # Public: Defines an attribute as an enumerated set of symbol/values
+    #
+    # attrib  - name of the attribute or database column
+    # args    - list of symbols, reset values, with an optional options Hash
+    #           a non-symbolic arg resets the counter to that value
+    #           Non-integer values can be given if the #next() method is provided
+    #           nil can be passed to skip the positional value
+    #
+    # Examples
+    #
+    #   EasyAttributes::Config.define_enum :status, :active, :inactive
+    #   EasyAttributes::Config.define_enum :status, :active, :inactive, start:1, step:10
+    #   EasyAttributes::Config.define_enum :status, :active, 11, :inactive
+    #   
+    # Returns the attribute definition structure
+    def self.define_enum(attrib, *args)
+      opt = {start:0, step:1}.merge(args.last.is_a?(Hash) ? args.pop : {})
+      symbols = {}
+      i = opt[:start]
+      args.each do |arg|
+        if arg.is_a?(Symbol) || arg.nil?
+          symbols[arg] = i unless arg.nil?
+          opt[:step].times {i = i.next}
+        else
+          i = arg
+        end
       end
-      @attributes[attribute][symbol] = value
-      @values[attribute][value] = symbol
-      @extras[attribute][value] = extras unless extras.empty?
+      define_attribute(attrib, symbols)
     end
     
-    # Returns the symbol table
-    def self.attributes
-      @attributes
+    # Public: Returns the definition for the given attribute
+    #
+    # attrib  - name of the attribute or database column
+    #
+    # Returns a Hash of {symbols:{symbol:value,}, values:{value:symbol}, options:{name:value}}
+    #
+    def self.definition(attrib)
+      @attributes.fetch(attrib.to_sym) {Hash.new}
+    end
+
+   
+    # Returns an array of [name,value] pairs useful for HTML select options
+    #
+    #  BELONGE ELSEWHERE
+    #
+    def select_options(attrib, *args)
+      defn = definition.attrib
+      return [] if defn.empty?
+      return defn[:options][:select_options] if defn[:options].has_key?(:select_options)
+      return defn[:options][:select_proc].call(attrib, defn, *args) if defn[:options].has_key?(:select_proc)
+      defn[:symbols].collect {|s,v| [s.to_s.capitalize, v]}
     end
     
-    end
   end
   
+  # attr_values :attr, name:value, ...
+  # attr_enum   :attr, :name, ....
+  # attr_defined :attr, :attr=>:defined_attr
+  # attr_bytes  :attr, ..., :base=>2
+  # attr_fixed_point :attr, :precision=>2
+  # attr_money  :attr, :precision=>2
+  #
   module ClassMethods
     
-    # Defines an attribute as a hash like {:key=>value,...} where key names are used interchangably with values
-    def attr_values(attribute, *args)
-      opt = args.size > 1 ? args.pop : {}
-      hash = args.first
-      
-      # Use :like=>colname to copy from another definition (ClassName#attribute) or from the loaded table columns
-      if opt[:like]
-        hash = EasyAttributes::Config.attributes[opt[:like]]
-      nd
-      
+    # Public: Defines an attribute with a Hash of symbolic synonyms for the values.
+    #
+    # attribute - symbolic name of the attribute
+    # values    - a hash of {symbol:value, ....} mappings
+    #             a optional key of :options=>{name:value} defines any options for the attribute
+    # Examples
+    #
+    #   attr_values :status, active:1, inactive:2
+    #   attr_values :status, active:1, inactive:2, 
+    #     options:{select_options:lambda { |*args| attr_select_options(*args) }
+    #
+    # Creates these instance methods (for a "status" attribute):
+    #
+    #   status_sym()                # Returns the symbolic name instead of value
+    #   status_sym=(:inactive)      # Used for setting the attrivute by symbolic name instead
+    #   status_is?(symbol1,...)     # Returns true if the attribute symbol is in the list of symbols
+    #   
+    # And these class methods:
+    #
+    #   status_select(*args)        # Returns an array of [symbol,value] pairs suitable for HTML Select Options
+    #   status_values()             # Returns an array of all defined values for attribute
+    #   status_symbols()            # Returns an array of all defined symbols for attribute
+    #
+    # Returns nothing
+    def self.attr_values(attribute, *args)
+      defn = Config.define_attribute(attribute, *args)
+      define_attr_accessors(defn)
+    end
+
+    def self.define_attr_accessors(defn)
       name = "#{self.name}##{attribute}"
       EasyAttributes.add_definition( name, hash)
       code = ''
@@ -130,48 +248,62 @@ module EasyAttributes
           EasyAttributes.sym_for_value("#{name}", #{attribute})
         end
         def self.#{attribute}_values
-          EasyAttributes::Config.attributes["#{name}"]
+          EasyAttributes::Config.definition("#{name}")[:values][values]
         end
         def #{attribute}_is?(*args)
           EasyAttributes.value_is?("#{name}", #{attribute}, *args)
         end
       )
-      if EasyAttributes::Config.orm == :active_model
-        code += %Q(
-          def #{attribute}=(v)
-            self[:#{attribute}] = v.is_a?(Symbol) ? EasyAttributes.value_for_sym("#{attribute}", v) : v; 
-          end
-        )
-      end
+
+      ## status=(symbol_or_value)    # A setter for ActiveModel configurations
+      #if EasyAttributes::Config.orm == :active_model
+      #  code += %Q(
+      #    def #{attribute}=(v)
+      #      self[:#{attribute}] = v.is_a?(Symbol) ? EasyAttributes.value_for_sym("#{attribute}", v) : v; 
+      #    end
+      #  )
+      #end
       #puts code
+
       class_eval code
     end
 
-    # Sets up a symbolic list of names for an enumerated value. First symbolic name is set to 0
-    # unless :start->n is specified. Use :step=>n to specify an increment value.
-    #   attr_enum :month, :jan, :feb, ..., :dec :start=>1, :step=>1
-    #   Use nil as a placeholder to comsume an unused value.
-    #   Reset the value in place by giving an int (42) used for the next symbol
-    def attr_enum(attribute, *args)
-      opt = args.size > 1 ? args.pop : {}
-      start = opt[:start] || 0
-      step = opt[:step] || 1
-      value=start
-      hash = {}
-      args.each do |sym|
-        case sym.class
-        when Symbol 
-          hash[sym] = value
-          value += step
-        when Fixnum
-          value = sym
-        when NilClass
-          value += step
-        end
-      end
-      attr_value( attribute, hash, opt )
+    # Public: Defines an attribute as an Enumeration of symbol name. 
+    #
+    # By default, the first symbol is mapped to 0 (zero), and increments by 1. The :start and 
+    # :step values in the options hash can change those settings. Also, "#next()" is called on 
+    # the start value, so any non-numeric object that supports that call can be used (such as 
+    # a string). A nil in a position will skip that value, and any other non-symbol will reset 
+    # the value of the next symbol to that one.
+    #
+    # This is an alternate syntax for the attr_values() method
+    #
+    # attribute - symbolic name of the attribute
+    # args      - a list of symbol names, nil skip tokens, and value changes
+    #             * A symbol name will map to the current value
+    #             * A nil skips the current value in the list
+    #             * Any other value replaces the current value for the subsequent symbol
+    # options   - a optional key of :options=>{name:value} defines any options for the attribute
+    #
+    # Examples
+    #
+    #   attr_enum :status, :active, :inactive             # => {active:0, inactive:1}
+    #   attr_enum :month,  :jan, :feb, ..., :dec, start:1 # => {jan:1, feb:2, ..., dec:12}
+    #   attr_enum :status, :active, :inactive, nil, :suspended, 99, :deleted, start:10, step:10
+    #     # => same as: {active:10, inactive:20, suspended:40, deleted:99}
+    #
+    # Creates the same methods as attr_values().
+    #
+    # Returns nothing
+    def self.attr_enum(attribute, *args)
+      defn = Config.define_enum(attribute, *args)
+      define_attr_accessors(defn)
     end
 
+    ###########################################################################
+    # EasyAttributes Byte Helpers
+    ###########################################################################
+    
     # attr_bytes allows manipultion and display as kb, mb, gb, tb, pb
     # Adds method: attribute_bytes=() and attribute_bytes(:unit, :option=>value )
     def attr_bytes(attribute, *args)
@@ -224,8 +356,6 @@ module EasyAttributes
       )
     end
     
-  end
-
   # Returns a [getter_code, setter_code] depending on the orm configuration
   def self.getter_setter(attribute)
     if EasyAttributes::Config.orm == :active_model
@@ -338,9 +468,9 @@ module EasyAttributes
 	  (bytes*100).to_i/100
   end
   
-  ##############################################################################
-  # attr_money helpers
-  ##############################################################################
+  ###########################################################################
+  # EasyAttributes Fixed-Precision as Integer Helpers
+  ###########################################################################
   
   # Returns the money string of the given integer value. Uses relevant options from #easy_money
   def self.integer_to_money(value, *args)
@@ -422,4 +552,5 @@ module EasyAttributes
     value
   end
   
+  end
 end

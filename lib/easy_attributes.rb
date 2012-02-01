@@ -50,12 +50,25 @@ module EasyAttributes
     #
     #   Definition.find_or_create(:status).add_symbol(:retired, 3)
     #   Definition.find_or_create(:status, active:1, inactive:2)
+    #   Definition.find_or_create(:storage, {}, {kb_size:1000})
     #
     # Returns an existing or new instance of Definition
     #
     def self.find_or_create(attribute, *definition)
+      attribute = attribute.to_sym
       @attributes ||= {}
-      @attributes[attribute.to_sym] ||= Definition.new(attribute, *definition)
+      unless @attributes.has_key?(attribute)
+        @attributes[attribute] = Definition.new(attribute, *definition)
+      end
+      @attributes[attribute]
+    end
+
+    def to_s
+      "<#EasyAttributes::Definition #{@attribute} #{@symbols}>"
+    end
+
+    def self.definitions
+      @attributes
     end
 
     # Public: Creates a new Definition for the attribute and definition list
@@ -179,7 +192,7 @@ module EasyAttributes
     #   definition.symbol_of(1)  # => :active
     #
     # Returns the defined symbol (eg.:active) for the given value on the attribute
-    def self.symbol_of(value, default=nil)
+    def symbol_of(value, default=nil)
       self.values.fetch(value) { block_given? ? yield(value) : default }
     end
 
@@ -200,6 +213,7 @@ module EasyAttributes
       args.each do |arg|
         return true if value == value_of(arg)
       end
+      false
     end
 
     # Public: Implements the comparison operator (cmp, <=>) for a value against a symbolic name
@@ -268,6 +282,10 @@ module EasyAttributes
     # For the experimental Value class. Takes a value or symbol
     def value(v)
       Value.new(self, v)
+    end
+
+    def inspect
+      @value
     end
   end
 
@@ -453,12 +471,14 @@ module EasyAttributes
     #
     # Exanples
     #
-    #   attr_name :status, :role, widget_type: :general_type
+    #   attr_shared :status, :role, widget_type: :general_type
     #
     # Calls attr_values with each definition
-    def attr_names(*attributes)
+    def attr_shared(*attributes)
+      #puts "attr_shared(#{attributes})"
       mapping = attributes.last.is_a?(Hash) ? attributes.pop : {}
       attributes.each { |attribute| attr_values(attribute) }
+      #puts "attr_shared(#{mapping})"
       mapping.each { |attribute,alternate_name| easy_attribute_accessors(attribute, Definition.find_or_create(alternate_name)) }
     end
 
@@ -472,6 +492,7 @@ module EasyAttributes
     #   <attribute>_cmp()
     #
     def easy_attribute_accessors(attribute, defn)
+      #puts "easy_attribute_accessors(#{attribute}, #{defn})"
       attribute = attribute.to_sym
       @easy_attribute_definitions ||= {}
       @easy_attribute_definitions[attribute] = defn
@@ -519,11 +540,52 @@ module EasyAttributes
         end
       )
 
-      puts code
+      #puts code
       class_eval code
     end
-  end
-end
+
+    # attr_bytes allows manipultion and display as kb, mb, gb, tb, pb
+    # Adds method: attribute_bytes=() and attribute_bytes(:unit, :option=>value )
+    # Public: Adds byte attributes helpers to the class
+    #
+    # attribites - List of attribute names to generate helpers for
+    # options    - Hash of byte helper options
+    #
+    # Example
+    #
+    #   attr_bytes :bandwidth
+    #   attr_bytes :storage, :kb_size=>1000
+    #
+    # Adds the following helpers
+    #
+    #   bandwidth_bytes()         # => "10 GB"
+    #   bandwidth_bytes=("10 GB") # => 10_000_000_000
+    #
+    def attr_bytes(*args)
+      opt = args.last.is_a?(Hash) ? args.op : {}
+      code = ''
+
+      args.each do |attribute|
+        unless EasyAttributes::Config.orm == :active_model || opt[:orm] == :active_model
+          attr_accessor attribute if EasyAttributes::Config.orm == :attr
+        end
+        defn = Definition.find_or_create(attribute, {}, opt)
+        code += %Q(
+          def #{attribute}_bytes
+            EasyAttributes::format_bytes(self.#{attribute}, #{self.name}.#{attribute}_definition.options[:#{attribute}] { {} })
+          end
+          def #{attribute}_bytes=(v)
+            self.#{attribute} = 
+              EasyAttributes::parse_bytes(v, #{self.name}.#{attribute}_definition.options[:#{attribute}] { {} })
+          end
+        )
+      end
+
+      #puts code
+      class_eval code
+    end
+  end # EasyAttributes::ClassMethods
+end # EasyAttributes Module
 
 
 

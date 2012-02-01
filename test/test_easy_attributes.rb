@@ -1,43 +1,48 @@
 require 'helper'
 EasyAttributes::Config.orm = :attr
+EasyAttributes::Definition.find_or_create(:status, {forsale:1, contract:2, sold:3})
+EasyAttributes::Definition.find_or_create(:status).add_symbol(:deleted, 9)
 
 class TestEasyAttributes < Test::Unit::TestCase
   include EasyAttributes
-#  attr_sequence :tas, :n1, :n2
-#  attr_values :tav, :k1=>1, :k2=>2, :k3=>3
-#  attr_values :status, {}, :like=>'TestEasyAttributes#tav'
+  attr_enum   :tas, :n1, :n2, nil, :n4, 8, :n8
+  attr_values :tav, :k1=>1, :k2=>2, :k3=>3
+  attr_shared :status, status1: :status
 #  attr_bytes  :bw
 #  attr_money  :amount
-  
-#  def test_attr_sequence
-#    self.tas_sym = :n1
-#    assert_equal self.tas, 1
-#    assert_equal self.tas_sym, :n1
-#  end
-#  
-#  def test_attr_values
-#    self.tav_sym = :k1
-#    assert_equal tav, 1
-#    self.tav_sym = :k2
-#    assert_equal tav, 2
-#    assert_equal tav_sym, :k2
-#    assert_equal tav_is?(:k2), true
-#    assert_equal tav_is?(:k1, :k3), false
-#    #self.tav = :k1
-#    #assert_equal tav, 1
-#  end
-#  
-#  def test_like
-#    self.status_sym = :k1
-#    assert_equal self.status, 1
-#  end
-#
-#  # Removed for now, not shipping my data file!
-#  def test_load
-#    #EasyAttributes::Config.load "values"
-#    #assert_equal EasyAttributes::Config.attributes['status'][:ok], 8
-#  end
-#  
+
+  def test_definitions
+    EasyAttributes::Definition.find_or_create(:role, {admin:'a', moderator:'m', user:'u'})
+  end
+
+  def test_attr_enum
+    self.tas_sym = :n1
+    assert_equal self.tas, 1
+    assert_equal self.tas_sym, :n1
+    assert_equal TestEasyAttributes.tas_definition.value_of(:n4), 4
+    assert_equal TestEasyAttributes.tas_definition.value_of(:n8), 8
+  end
+
+  def test_attr_values
+    self.tav_sym = :k1
+    assert_equal tav, 1
+    self.tav_sym = :k2
+    assert_equal tav, 2
+    assert_equal tav_sym, :k2
+    assert_equal tav_is?(:k2), true
+    assert_equal tav_is?(:k1, :k3), false
+  end
+
+  def test_attr_shared
+    puts EasyAttributes::Definition.definitions
+    self.status_sym = :forsale
+    assert_equal self.status, 1
+    self.status_sym = :deleted
+    assert_equal status, 9
+    self.status1_sym = :forsale
+    assert_equal self.status1, 1
+  end
+
 #  def test_attr_bytes
 #    self.bw = 1024
 #    assert_equal bw, 1024

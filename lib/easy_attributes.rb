@@ -45,6 +45,11 @@ module EasyAttributes
     #
     # attribute - The name of the attribute
     # definition - The optional definition list passed to initialize
+    #              A has of symbol_name => values
+    #              Make sure the type of value matches your use, 
+    #              either a string "42" or integer "42".to_i 
+    # attr_options - A optiona; Hash of attribute names to a hash of additional info
+    #              {status:{help:"...", title:"Status"}}
     #
     # Examples
     #
@@ -204,12 +209,12 @@ module EasyAttributes
     #
     # Examples
     #
-    #   definition.value_is?(self.status, :active)         # => false (maybe)
-    #   definition.value_is?(self.:status, :active, :inactive)  # => true (maybe)
-    #   self.value_is?(:status, :between, :active, :inactive)  # => true (maybe)
+    #   definition.value_in(self.status, :active)         # => false (maybe)
+    #   definition.value_in(self.:status, :active, :inactive)  # => true (maybe)
+    #   self.value_in(:status, :between, :active, :inactive)  # => true (maybe)
     #
     # Returns true if the value matches
-    def value_is?(value, *args)
+    def value_in(value, *args)
       args.each do |arg|
         return true if value == value_of(arg)
       end
@@ -417,7 +422,7 @@ module EasyAttributes
     #
     #   status_sym()                # Returns the symbolic name instead of value
     #   status_sym=(:inactive)      # Used for setting the attrivute by symbolic name instead
-    #   status_is?(symbol, ...)     # Returns true if the attribute symbol is in the list of symbols
+    #   status_in(symbol, ...)     # Returns true if the attribute symbol is in the list of symbols
     #   status_cmp(symbol)          # Returns the comparison of the value <=> symbol
     #
     # And these class methods:
@@ -475,20 +480,18 @@ module EasyAttributes
     #
     # Calls attr_values with each definition
     def attr_shared(*attributes)
-      #puts "attr_shared(#{attributes})"
       mapping = attributes.last.is_a?(Hash) ? attributes.pop : {}
       attributes.each { |attribute| attr_values(attribute) }
-      #puts "attr_shared(#{mapping})"
       mapping.each { |attribute,alternate_name| easy_attribute_accessors(attribute, Definition.find_or_create(alternate_name)) }
     end
 
     # Private: Creates attribute accessors for the attribute /definition for attr_values
     #
-    # Creates
-    #   self.<attribute>_attribute()
+    # Creates these methods dynamically on the host class
+    #   self.<attribute>_definition()
     #   <attribute>_sym()
     #   <attribute>_sym=()
-    #   <attribute>_is?()
+    #   <attribute>_in()
     #   <attribute>_cmp()
     #
     def easy_attribute_accessors(attribute, defn)
@@ -523,8 +526,8 @@ module EasyAttributes
         def #{attribute}_sym=(v)
           self.#{attribute} = #{self.name}.#{attribute}_definition.value_of(v)
         end
-        def #{attribute}_is?(*args)
-          #{self.name}.#{attribute}_definition.value_is?(#{attribute}, *args)
+        def #{attribute}_in(*args)
+          #{self.name}.#{attribute}_definition.value_in(#{attribute}, *args)
         end
         def #{attribute}_cmp(other)
           #{self.name}.#{attribute}_definition.cmp(#{attribute}, other)
@@ -583,6 +586,10 @@ module EasyAttributes
 
       #puts code
       class_eval code
+    end
+
+    def attr_definitions(attribute)
+      @easy_attribute_definitions[attribute.to_sym]
     end
   end # EasyAttributes::ClassMethods
 end # EasyAttributes Module

@@ -260,8 +260,8 @@ module EasyAttributes
     # attribute - symbolic name of attribute
     #
     # Returns an array of [name, value] pairs.
-    def select_option_values(attrib)
-      self.symbols.collect {|s,v| [s.to_s.capitalize, v]}
+    def select_option_values(*args)
+      self.symbols.collect {|s,v| [symbol_option_name(s,*args), v]}
     end
 
     # Private: Builds a list of [name, symbol] pairs usefule for HTML select options
@@ -270,8 +270,18 @@ module EasyAttributes
     # attribute - symbolic name of attribute
     #
     # Returns an array of [name, symbol] pairs.
-    def select_option_symbols(attrib)
-      self.symbols.collect {|s,v| [s.to_s.capitalize, s]}
+    def select_option_symbols(*args)
+      self.symbols.collect {|s,v| [symbol_option_name(s,*args), s]}
+    end
+
+    def symbol_option_name(s, *args)
+      if @attr_options.has_key?(s)
+        args.each {|arg| return @attr_options[s][arg] if @attr_options[s].has_key?(arg) }
+        [:option_name, :title, :name] .each do |f|
+          return @attr_options[s][f] if @attr_options[s].has_key?(f)
+        end
+      end
+      s.to_s.capitalize
     end
 
     # Defines each() for Enumerable
@@ -477,12 +487,20 @@ module EasyAttributes
     # Exanples
     #
     #   attr_shared :status, :role, widget_type: :general_type
+    #   attr_shared employee_status:Employee.status_definition()
     #
     # Calls attr_values with each definition
     def attr_shared(*attributes)
       mapping = attributes.last.is_a?(Hash) ? attributes.pop : {}
       attributes.each { |attribute| attr_values(attribute) }
-      mapping.each { |attribute,alternate_name| easy_attribute_accessors(attribute, Definition.find_or_create(alternate_name)) }
+      mapping.each do |attribute,alternate_name|
+        defn = if alternate_name.is_a?(Definition)
+                   alternate_name
+                 else
+                   Definition.find_or_create(alternate_name)
+                 end
+        easy_attribute_accessors(attribute, defn)
+      end
     end
 
     # Private: Creates attribute accessors for the attribute /definition for attr_values
@@ -531,6 +549,9 @@ module EasyAttributes
         end
         def #{attribute}_cmp(other)
           #{self.name}.#{attribute}_definition.cmp(#{attribute}, other)
+        end
+        def self.#{attribute}_options(*args)
+          #{self.name}.#{attribute}_definition.select_option_symbols(*args)
         end
 
         # Experimental for the EasyAttributes::Value class

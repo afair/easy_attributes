@@ -534,38 +534,64 @@ module EasyAttributes
         attr_accessor attribute
       end
 
-      code += %Q(
-        def self.#{attribute}_definition
-          @easy_attribute_definitions.fetch(:#{attribute}) { raise "Attribute #{attribute} not found" }
-        end
-        def #{attribute}_sym
-          #{self.name}.#{attribute}_definition.symbol_of(#{attribute})
-        end
-        def #{attribute}_sym=(v)
-          self.#{attribute} = #{self.name}.#{attribute}_definition.value_of(v)
-        end
-        def #{attribute}_in(*args)
-          #{self.name}.#{attribute}_definition.value_in(#{attribute}, *args)
-        end
-        def #{attribute}_cmp(other)
-          #{self.name}.#{attribute}_definition.cmp(#{attribute}, other)
-        end
-        def self.#{attribute}_options(*args)
-          #{self.name}.#{attribute}_definition.select_option_symbols(*args)
-        end
+      #------------------------------------------------------------------------
+      # Class Methods
+      #------------------------------------------------------------------------
 
-        # Experimental for the EasyAttributes::Value class
-        def #{attribute}_value
-          return #{attribute} if #{attribute}.is_a?(EasyAttributes::Value)
-          #{self.name}.#{attribute}_definition.value(#{attribute})
-        end
-        def #{attribute}_value=(v)
-          self.#{attribute} = #{self.name}.#{attribute}_definition.value(v)
-        end
-      )
+      # Returns the definition of the passed Easy Attribute name
+      define_singleton_method(:easy_attribute_definition) do |attrib|
+        @easy_attribute_definitions.fetch(attrib.to_sym) { raise "EasyAttribute #{attrib} not found" }
+      end
 
-      #puts code
-      class_eval code
+      # Returns an array of (HTML Select) option pairs
+      define_singleton_method("#{attribute}_options") do |*args|
+        easy_attribute_definition(attribute).select_option_symbols(*args)
+      end
+
+      #------------------------------------------------------------------------
+      # Instance Methods
+      #------------------------------------------------------------------------
+
+      # <attribute>_definition()
+      # Returns the definition ojbect for the easy attribute
+      define_method("#{attribute}_definition") do
+        self.class.easy_attribute_definition(attribute)
+      end
+
+      # <attribute>_sym()
+      # Returns the symbolic name of the current value of "attribute"
+      define_method("#{attribute}_sym") do
+        self.class.easy_attribute_definition(attribute).symbol_of(self.send(attribute))
+      end
+
+      # <attribute>_sym=(new_symbol)
+      # Sets the value of "attribute" to the associated value of the passed symbolic name
+      define_method("#{attribute}_sym=") do |sym|
+        self.send("#{attribute}=", self.class.easy_attribute_definition(attribute).value_of(sym))
+      end
+
+      # <attribute>_in(*names)
+      # Returns true if the symbolic name of the current value of "attribute" is in the list of names.
+      define_method("#{attribute}_in") do |*args|
+        self.class.easy_attribute_definition(attribute).value_in(self.send(attribute),*args)
+      end
+
+      # <attribute>_cmp(other)
+      # Standard "cmp" or <=> compare for "attribute" against a symbolic name.
+      define_method("#{attribute}_cmp") do |other|
+        self.class.easy_attribute_definition(attribute).cmp(self.send(attribute),other)
+      end
+
+      # <attribute>value()
+      # Experimental for the EasyAttributes::Value class, getter and setter methods
+      define_method("#{attribute}_value") do
+        self.class.easy_attribute_definition(attribute).value(self.send(attribute))
+      end
+
+      # <attribute>value=(new_value_object)
+      define_method("#{attribute}_value=") do |v|
+        self.send("#{attribute}=", self.class.easy_attribute_definition(attribute).value(v))
+      end
     end
 
     # attr_bytes allows manipultion and display as kb, mb, gb, tb, pb

@@ -111,7 +111,7 @@ module EasyAttributes
       symbols = Hash[* args.first.collect {|k,v| [k.to_sym, v]}.flatten]
       self.symbols.merge!(symbols)
       self.values  = Hash[* self.symbols.collect {|k,v| [v, k]}.flatten]
-      self.options.merge!(options)
+      self.attr_options.merge!(options)
       #puts "DEFINED #{@attribute} #{self.symbols.inspect}"
     end
 
@@ -302,6 +302,68 @@ module EasyAttributes
     def inspect
       @value
     end
+
+    ###########################################################################
+    # Official Definitions for kilobyte and kibibyte quantity prefixes
+    ###########################################################################
+    KB =1000; MB =KB **2; GB= KB **3; TB =KB **4; PB =KB **5; EB =KB **6; ZB =KB **7; YB =KB **8
+    KiB=1024; MiB=KiB**2; GiB=KiB**3; TiB=KiB**4; PiB=KiB**5; EiB=KiB**6; ZiB=KiB**7; YiB=KiB**8
+    BINARY_PREFIXES  = {:B=>1,:KiB=>KiB,:MiB=>MiB,:GiB=>GiB,:TiB=>TiB,:PiB=>PiB,:EiB=>EiB,:ZiB=>ZiB,:TiB=>YiB}
+    DECIMAL_PREFIXES = {:B=>1,:KB=>KB,  :MB=>MB,  :GB=>GB,  :TB=>TB,  :PB=>PB,  :EB=>EB,  :ZB=>ZB,  :YB=>YB}
+    JEDEC_PREFIXES   = {:B=>1,:KB=>KiB, :MB=>MiB, :GB=>GiB, :TB=>TiB, :PB=>PiB, :EB=>EiB, :ZB=>ZiB, :TB=>YiB}
+
+    # Returns a hash of prefix names to decimal quantities for the given setting
+    def self.byte_prefixes(kb_size=0)
+      case kb_size
+      when 1000, :decimal, :si then DECIMAL_PREFIXES
+      when :old, :jedec, 1024 then JEDEC_PREFIXES
+      when :new, :iec then BINARY_PREFIXES
+      else DECIMAL_PREFIXES.merge(BINARY_PREFIXES) # Both? What's the least surprise?
+      end
+    end
+
+    # Takes a number of bytes and an optional :unit argument and :precision option, returns a formatted string of units
+    def format_bytes(v, *args)
+      #prefixes = EasyAttributes.byte_prefixes(opt[:kb_size]||EasyAttributes::Config.kb_size||0)
+      opt = attr_options
+      prefixes = Definition.byte_prefixes(opt[:kb_size]||Config.kb_size||1000)
+      if args.size > 0 && args.first.is_a?(Symbol)
+        (unit, precision) = args
+        v = "%.#{precision||opt[:precision]}f" % (1.0 * v / (prefixes[unit]||1))
+        return "#{v} #{unit}"
+      else
+        precision = args.shift || opt.fetch(:precision) { 2 }
+        prefixes.sort{|a,b| a[1]<=>b[1]}.reverse.each do |pv|
+          next if pv[1] > v
+          v = "%f.10f" % (1.0 * v / pv[1])
+          v = v[0,precision+1] if v =~ /^(\d)+\.(\d+)/ && v.size > (precision+1)
+          v.gsub!(/\.0*$/, '')
+          return "#{v} #{pv[0]}"
+        end
+      end
+      v.to_s
+    end
+
+    # Takes a string of "number units" or Array of [number, :units] and returns the number of bytes represented.
+    def parse_bytes(v, *args)
+     #opt = EasyAttributes.pop_options(args, :precision=>3)
+      opt = attr_options
+      # Handle v= [100, :KB]
+      if v.is_a?(Array)
+        bytes = v.shift
+        v = "#{bytes} #{v.shift}"
+      else
+        bytes = v.to_f
+      end
+
+      if v.downcase =~ /^\s*(?:[\d\.]+)\s*([kmgtpezy]i?b)/i
+        units = ($1.size==2 ? $1.upcase : $1[0,1].upcase+$1[1,1]+$1[2,1].upcase).to_sym
+        prefixes = Definition.byte_prefixes(opt[:kb_size]||Config.kb_size||1000)
+        prefixes = Definition.byte_prefixes(:both) unless prefixes.has_key?(units)
+        bytes *= prefixes[units] if prefixes.has_key?(units)
+      end
+      (bytes*100).to_i/100
+    end
   end
 
   #############################################################################
@@ -437,7 +499,7 @@ module EasyAttributes
     #
     # And these class methods:
     #
-    #   status_attribute()
+    #   status_definition()
     #     Returns the EasyAttributes::Definition for the attribute, on which you can call cool things like
     #     value_of(), symbol_of(), select_options(), etc.
     #
@@ -539,8 +601,10 @@ module EasyAttributes
       #------------------------------------------------------------------------
 
       # Returns the definition of the passed Easy Attribute name
-      define_singleton_method(:easy_attribute_definition) do |attrib|
-        @easy_attribute_definitions.fetch(attrib.to_sym) { raise "EasyAttribute #{attrib} not found" }
+      unless self.respond_to?(:easy_attribute_definition)
+        define_singleton_method(:easy_attribute_definition) do |attrib|
+          @easy_attribute_definitions.fetch(attrib.to_sym) { raise "EasyAttribute #{attrib} not found" }
+        end
       end
 
       # Returns an array of (HTML Select) option pairs
@@ -612,32 +676,45 @@ module EasyAttributes
     #   bandwidth_bytes=("10 GB") # => 10_000_000_000
     #
     def attr_bytes(*args)
+      @easy_attribute_definitions ||= {}
       opt = args.last.is_a?(Hash) ? args.op : {}
       code = ''
 
       args.each do |attribute|
+        attribute = attribute.to_sym
         unless EasyAttributes::Config.orm == :active_model || opt[:orm] == :active_model
           attr_accessor attribute if EasyAttributes::Config.orm == :attr
         end
         defn = Definition.find_or_create(attribute, {}, opt)
-        code += %Q(
-          def #{attribute}_bytes
-            EasyAttributes::format_bytes(self.#{attribute}, #{self.name}.#{attribute}_definition.options[:#{attribute}] { {} })
-          end
-          def #{attribute}_bytes=(v)
-            self.#{attribute} = 
-              EasyAttributes::parse_bytes(v, #{self.name}.#{attribute}_definition.options[:#{attribute}] { {} })
-          end
-        )
+        @easy_attribute_definitions[attribute] = defn
+
+        # <attribute>_bytes()
+        # Returns the symbolic name of the current value of "attribute"
+        define_method("#{attribute}_bytes") do
+          self.class.easy_attribute_definition(attribute).format_bytes(self.send(attribute))
+        end
+
+        # <attribute>_bytes=(new_symbol)
+        # Sets the value of "attribute" to the associated value of the passed symbolic name
+        define_method("#{attribute}_bytes=") do |sym|
+          self.send("#{attribute}=", self.class.easy_attribute_definition(attribute).parse_bytes(sym))
+        end
+
+        #code += %Q(
+        #  def #{attribute}_bytes
+        #    EasyAttributes::format_bytes(self.#{attribute}, #{self.name}.#{attribute}_definition.options[:#{attribute}] { {} })
+        #  end
+        #  def #{attribute}_bytes=(v)
+        #    self.#{attribute} = 
+        #      EasyAttributes::parse_bytes(v, #{self.name}.#{attribute}_definition.options[:#{attribute}] { {} })
+        #  end
+        #)
       end
 
       #puts code
-      class_eval code
+      #class_eval code
     end
 
-    def attr_definitions(attribute)
-      @easy_attribute_definitions[attribute.to_sym]
-    end
   end # EasyAttributes::ClassMethods
 end # EasyAttributes Module
 

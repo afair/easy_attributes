@@ -10,9 +10,9 @@ EasyAttributes::Definition.find_or_create(:status).add_symbol(:deleted, 9)
 
 class Sample
   include EasyAttributes
-  #attr_accessor :price, :balance
-  #attr_money :price
-  #attr_money :balance
+  attr_accessor :price, :balance
+  attr_money :price
+  attr_money :balance
   attr_values :status, active:1, retired:5, inactive:10
   attr_enum :lifestage, :baby, :toddler, :child, :teen, :adult, :elderly, :dead
   attr_shared status1: :status2

@@ -490,6 +490,93 @@ module EasyAttributes
 
   end
 
+  module FixedPoint
+    ###########################################################################
+    # EasyAttributes Fixed-Precision as Integer Helpers
+    ###########################################################################
+
+    # Returns the money string of the given integer value. Uses relevant options from #easy_money
+    def self.integer_to_money(value, *args)
+      opt = args.last.is_a?(Hash) ? args.pop : {}
+      opt[:positive] ||= "%.#{opt[:precision]||2}f"
+      pattern =
+      if value.nil?
+        value = 0
+        opt[:nil] || opt[:positive]
+      else
+        case value <=> 0
+        when 1 then opt[:positive]
+        when 0 then opt[:zero] || opt[:positive]
+        else
+          value = -value if opt[:negative] && opt[:negative] != opt[:positive]
+          opt[:negative] || opt[:positive]
+        end
+      end
+      value = self.format_money( value, pattern, opt)
+      value = opt[:unit]+value if opt[:unit]
+      value.gsub!(/\./,opt[:separator]) if opt[:separator]
+      if opt[:delimiter] && (m = value.match(/^(\D*)(\d+)(.*)/))
+        # Adapted From Rails' ActionView::Helpers::NumberHelper
+        n = m[2].gsub(/(\d)(?=(\d\d\d)+(?!\d))/, "\\1#{opt[:delimiter]}")
+        value=m[1]+n+m[3]
+      end
+      value
+    end
+
+    def self.integer_to_float(value, *args)
+      opt = args.last.is_a?(Hash) ? args.pop : {}
+      return (opt[:blank]||nil) if value.nil?
+      value = 1.0 * value / (10**(opt[:precision]||2))
+    end
+
+    # Returns the integer of the given money string. Uses relevant options from #easy_money
+    def self.money_to_integer(value, *args)
+      opt = args.last.is_a?(Hash) ? args.pop : {}
+      value = value.gsub(opt[:delimiter],'') if opt[:delimiter]
+      value = value.gsub(opt[:separator],'.') if opt[:separator]
+      value = value.gsub(/^[^\d\.\-\,]+/,'')
+      return (opt[:blank]||nil) unless value =~ /\d/
+      m = value.to_s.match(opt[:negative_regex]||/^(-?)(.+\d)\s*cr/i)
+      value = value.match(/^-/) ? m[2] : "-#{m[2]}" if m && m[2]
+
+      # Money string ("123.45") to proper integer withough passing through the float transformation
+      match = value.match(/(-?\d*)\.?(\d*)/)
+      return 0 unless match
+      value = match[1].to_i * (10 ** (opt[:precision]||2))
+      cents = match[2]
+      cents = cents + '0' while cents.length < (opt[:precision]||2)
+      cents = cents.to_s[0,opt[:precision]||2]
+      value += cents.to_i * (value<0 ? -1 : 1)
+      value
+    end
+
+    # Returns the integer (cents) value from a Float
+    def self.float_to_integer(value, *args)
+      opt = args.last.is_a?(Hash) ? args.pop : {}
+      return (opt[:blank]||nil) if value.nil?
+      value = (value.to_f*(10**((opt[:precision]||2)+1))).to_i/10 # helps rounding 4.56 -> 455 ouch!
+    end
+
+    # Replacing the sprintf function to deal with money as float. "... %[flags]m ..."
+    def self.format_money(value, pattern="%.2m", *args)
+      opt = args.last.is_a?(Hash) ? args.pop : {}
+      sign = value < 0 ? -1 : 1
+      dollars, cents = value.abs.divmod( 10 ** (opt[:precision]||2))
+      dollars *= sign
+      parts = pattern.match(/^(.*)%([-\. \d+0]*)[fm](.*)/)
+      return pattern unless parts
+      intdec = parts[2].match(/(.*)\.(\d*)/)
+      dprec, cprec = intdec ? [intdec[1], intdec[2]] : ['', '']
+      dollars = sprintf("%#{dprec}d", dollars)
+      cents = '0' + cents.to_s while cents.to_s.length < (opt[:precision]||2)
+      cents = cents.to_s[0,cprec.to_i]
+      cents = cents + '0' while cents.length < cprec.to_i
+      value = parts[1] + "#{(dollars.to_i==0 && sign==-1) ? '-' : '' }#{dollars}#{cents>' '? '.':''}#{cents}" + parts[3]
+      value
+    end
+  end # FixedPoint
+
+
   #############################################################################
   # EasyAttributes::ClassMethods - Module defining methods added to classes when included
   #
@@ -682,9 +769,9 @@ module EasyAttributes
       end
     end
 
+    # Public: Adds byte attributes helpers to the class
     # attr_bytes allows manipultion and display as kb, mb, gb, tb, pb
     # Adds method: attribute_bytes=() and attribute_bytes(:unit, :option=>value )
-    # Public: Adds byte attributes helpers to the class
     #
     # attribites - List of attribute names to generate helpers for
     # options    - Hash of byte helper options
@@ -702,7 +789,6 @@ module EasyAttributes
     def attr_bytes(*args)
       @easy_attribute_definitions ||= {}
       opt = args.last.is_a?(Hash) ? args.op : {}
-      code = ''
 
       args.each do |attribute|
         attribute = attribute.to_sym
@@ -724,237 +810,91 @@ module EasyAttributes
           self.send("#{attribute}=", self.class.easy_attribute_definition(attribute).parse_bytes(sym))
         end
       end
+    end
 
-      #puts code
-      #class_eval code
+    # Public: Adds methods to get and set a fixed-point value stored as an integer.
+    #
+    # attributes - list of attribute names to define
+    # options    - Optional hash of definitions for the given list of attributes
+    #       :method_suffix - Use this as the alternative name to the *_fixed method names
+    #       :units - Use this as an alternative suffix name to the money methods ('dollars' gives 'xx_dollars')
+    #       :precision - The number of digits implied after the decimal, default is 2
+    #       :separator - The character to use after the integer part, default is '.'
+    #       :delimiter - The character to use between every 3 digits of the integer part, default none
+    #       :positive - The sprintf format to use for positive numbers, default is based on precision
+    #       :negative - The sprintf format to use for negative numbers, default is same as :positive
+    #       :zero - The sprintf format to use for zero, default is same as :positive
+    #       :nil - The sprintf format to use for nil values, default none
+    #       :unit - Prepend this to the front of the money value, say '$', default none
+    #       :blank - Return this value when the money string is empty or has no digits on assignment
+    #       :negative_regex - A Regular Expression used to determine if a number is negative (and without a - sign)
+    #
+    # Examples:
+    #   attr_fixed_point :gpa, precision:1
+    #   attr_fixed_point :price, precision:2
+    #
+    # Adds the following helpers
+    #
+    #   gpa_fixed()               #=> "3.8"
+    #   gpa_fixed=("3.8")         #=> 38
+    #   gpa_float()               #=> 3.8
+    #
+    # Returns nothing
+    def attr_fixed_point(*args)
+      @easy_attribute_definitions ||= {}
+      opt = args.last.is_a?(Hash) ? args.pop : {}
+      suffix = opt.fetch(:method_suffix) { 'fixed' }
+
+      args.each do |attribute|
+        attribute = attribute.to_sym
+        unless EasyAttributes::Config.orm == :active_model || opt[:orm] == :active_model
+          attr_accessor attribute if EasyAttributes::Config.orm == :attr
+        end
+        defn = Definition.find_or_create(attribute, {}, opt)
+        @easy_attribute_definitions[attribute] = defn
+
+        # <attribute>_fixed()
+        # Returns the symbolic name of the current value of "attribute"
+        define_method("#{attribute}_#{suffix}") do
+          FixedPoint::integer_to_money(send(attribute), self.class.easy_attribute_definition(attribute).attr_options)
+        end
+
+        # <attribute>_fixed=(new_value)
+        # Sets the value of "attribute" to the associated value of the passed symbolic name
+        define_method("#{attribute}_#{suffix}=") do |val|
+          self.send("#{attribute}=", FixedPoint::money_to_integer(val,
+            self.class.easy_attribute_definition(attribute).attr_options))
+        end
+
+        # <attribute>_float()
+        # Returns the value of the attribite as a float with desired precision point
+        define_method("#{attribute}_float") do
+          FixedPoint::integer_to_float(send(attribute), self.class.easy_attribute_definition(attribute).attr_options)
+        end
+      end
+    end
+
+    # Public: Alias of attr_fixed_point for a money type with suffix of 'money' and precision of 2.
+    #
+    # args       - list of money attributes
+    # options    - hash of attr_fixed_point options.
+    #
+    # Examples:
+    #   attr_money :price
+    #   attr_money :wager, method_suffix:'quatloos', precision:1, unit:'QL'
+    #
+    # Adds the following helpers
+    #
+    #   price_money()               #=> "42.00"
+    #   price_money=("3.8")         #=> 380
+    #   price_float()               #=> 3.8
+    #
+    def attr_money(*args)
+      opt = args.last.is_a?(Hash) ? args.pop : {}
+      opt = {method_suffix:'money', precision:2}.merge(opt)
+      args << opt
+      attr_fixed_point(*args)
     end
 
   end # EasyAttributes::ClassMethods
 end # EasyAttributes Module
-
-
-
-
-
-
-
-
-
-#!    ###########################################################################
-#!    # EasyAttributes Byte Helpers
-#!    ###########################################################################
-#!
-#!    # attr_bytes allows manipultion and display as kb, mb, gb, tb, pb
-#!    # Adds method: attribute_bytes=() and attribute_bytes(:unit, :option=>value )
-#!    def attr_bytes(attribute, *args)
-#!      name = "#{self.name}##{attribute}"
-#!      opt = EasyAttributes.pop_options(args)
-#!      #getter, setter = EasyAttributes.getter_setter(attribute)
-#!      attr_accessor attribute if EasyAttributes::Config.orm == :attr
-#!      code = %Q(
-#!        def #{attribute}_bytes(*args)
-#!          args.size == 0 ? v : EasyAttributes::format_bytes(self.#{attribute}, *args)
-#!        end
-#!        def #{attribute}_bytes=(v)
-#!          self.#{attribute} = EasyAttributes.parse_bytes(v)
-#!        end
-#!      )
-#!      #puts code
-#!      class_eval code
-#!    end
-#!
-#!    # Creates an money instance method for the given method, named "#{attribute}_money" which returns
-#!    # a formatted money string, and a #{attribute}_money= method used to set an edited money string.
-#!    # The original method stores the value as integer (cents, or other precision/currency setting). Options:
-#!    # * :money_method - Use this as the alternative name to the money-access methods
-#!    # * :units - Use this as an alternative suffix name to the money methods ('dollars' gives 'xx_dollars')
-#!    # * :precision - The number of digits implied after the decimal, default is 2
-#!    # * :separator - The character to use after the integer part, default is '.'
-#!    # * :delimiter - The character to use between every 3 digits of the integer part, default none
-#!    # * :positive - The sprintf format to use for positive numbers, default is based on precision
-#!    # * :negative - The sprintf format to use for negative numbers, default is same as :positive
-#!    # * :zero - The sprintf format to use for zero, default is same as :positive
-#!    # * :nil - The sprintf format to use for nil values, default none
-#!    # * :unit - Prepend this to the front of the money value, say '$', default none
-#!    # * :blank - Return this value when the money string is empty or has no digits on assignment
-#!    # * :negative_regex - A Regular Expression used to determine if a number is negative (and without a - sign)
-#!    #
-#!    def attr_money(attribute, *args)
-#!      opt = args.last.is_a?(Hash) ? args.pop : {}
-#!      money_method = opt.delete(:money_method) || "#{attribute}_#{opt.delete(:units)||'money'}"
-#!
-#!      class_eval %Q(
-#!      def #{money_method}(*args)
-#!        opt = args.last.is_a?(Hash) ? args.pop : {}
-#!        EasyAttributes.integer_to_money( #{attribute}, #{opt.inspect}.merge(opt))
-#!      end
-#!
-#!      def #{money_method}=(v, *args)
-#!        opt = args.last.is_a?(Hash) ? args.pop : {}
-#!        self.#{attribute} = EasyAttributes.money_to_integer( v, #{opt.inspect}.merge(opt))
-#!      end
-#!      )
-#!    end
-#!
-#!    # Returns a [getter_code, setter_code] depending on the orm configuration
-#!    def self.getter_setter(attribute)
-#!      if EasyAttributes::Config.orm == :active_model
-#!        ["self.attributes[:#{attribute}]", "self.write_attribute(:#{attribute}, v)"]
-#!      else
-#!        ["@#{attribute}", "@#{attribute} = v"]
-#!      end
-#!    end
-#!
-#!    def self.pop_options(args, defaults={})
-#!      args.last.is_a?(Hash) ? defaults.merge(args.pop) : defaults
-#!    end
-#!
-#!    def self.add_definition(attribute, hash, opt={})
-#!      EasyAttributes::Config.define attribute, hash
-#!    end
-#!
-#!    ##############################################################################
-#!    # attr_byte helpers
-#!    ##############################################################################
-#!
-#!    # Official Definitions for kilobyte and kibibyte quantity prefixes
-#!    KB =1000; MB =KB **2; GB= KB **3; TB =KB **4; PB =KB **5; EB =KB **6; ZB =KB **7; YB =KB **8
-#!    KiB=1024; MiB=KiB**2; GiB=KiB**3; TiB=KiB**4; PiB=KiB**5; EiB=KiB**6; ZiB=KiB**7; YiB=KiB**8
-#!    DECIMAL_PREFIXES = {:B=>1, :KB=>KB, :MB=>MB, :GB=>GB, :TB=>TB, :PB=>PB, :EB=>EB, :ZB=>ZB, :TB=>YB}
-#!    BINARY_PREFIXES = {:B=>1, :KiB=>KiB, :MiB=>MiB, :GiB=>GiB, :TiB=>TiB, :PiB=>PiB, :EiB=>EiB, :ZiB=>ZiB, :TiB=>YiB}
-#!
-#!    # Returns a hash of prefix names to decimal quantities for the given setting
-#!    def self.byte_prefixes(kb_size=0)
-#!      case kb_size
-#!      when 1000, :decimal, :si then DECIMAL_PREFIXES
-#!      when :old, :jedec, 1024 then {:KB=>KiB, :MB=>MiB, :GB=>GiB, :TB=>TiB, :PB=>PiB, :EB=>EiB, :ZB=>ZiB, :TB=>YiB}
-#!      when :new, :iec then BINARY_PREFIXES
-#!      else DECIMAL_PREFIXES.merge(BINARY_PREFIXES) # Both? What's the least surprise?
-#!      end
-#!    end
-#!
-#!    # Takes a number of bytes and an optional :unit argument and :precision option, returns a formatted string of units
-#!    def self.format_bytes(v, *args)
-#!      opt = EasyAttributes.pop_options(args, :precision=>3)
-#!      prefixes = EasyAttributes.byte_prefixes(opt[:kb_size]||EasyAttributes::Config.kb_size||0)
-#!      if args.size > 0 && args.first.is_a?(Symbol)
-#!        (unit, precision) = args
-#!        v = "%.#{precision||opt[:precision]}f" % (1.0 * v / (prefixes[unit]||1))
-#!        return "#{v} #{unit}"
-#!      else
-#!        precision = args.shift || opt[:precision]
-#!        prefixes.sort{|a,b| a[1]<=>b[1]}.reverse.each do |pv|
-#!          next if pv[1] > v
-#!          v = "%f.10f" % (1.0 * v / pv[1])
-#!          v = v[0,precision+1] if v =~ /^(\d)+\.(\d+)/ && v.size > (precision+1)
-#!          v.gsub!(/\.0*$/, '')
-#!          return "#{v} #{pv[0]}"
-#!        end
-#!      end
-#!      v.to_s
-#!    end
-#!
-#!    # Takes a string of "number units" or Array of [number, :units] and returns the number of bytes represented.
-#!    def self.parse_bytes(v, *args)
-#!      opt = EasyAttributes.pop_options(args, :precision=>3)
-#!      # Handle v= [100, :KB]
-#!      if v.is_a?(Array)
-#!        bytes = v.shift
-#!        v = "#{bytes} #{v.shift}"
-#!      else
-#!        bytes = v.to_f
-#!      end
-#!
-#!      if v.downcase =~ /^\s*(?:[\d\.]+)\s*([kmgtpezy]i?b)/i
-#!        units = ($1.size==2 ? $1.upcase : $1[0,1].upcase+$1[1,1]+$1[2,1].upcase).to_sym
-#!        prefixes = EasyAttributes.byte_prefixes(opt[:kb_size]||EasyAttributes::Config.kb_size||0)
-#!        bytes *= prefixes[units] if prefixes.has_key?(units)
-#!        #puts "v=#{v} b=#{bytes} u=#{units} #{units.class} bp=#{prefixes[units]} kb=#{opt[:kb_size]} P=#{prefixes.inspect}"
-#!      end
-#!      (bytes*100).to_i/100
-#!    end
-#!
-#!    ###########################################################################
-#!    # EasyAttributes Fixed-Precision as Integer Helpers
-#!    ###########################################################################
-#!
-#!    # Returns the money string of the given integer value. Uses relevant options from #easy_money
-#!    def self.integer_to_money(value, *args)
-#!      opt = args.last.is_a?(Hash) ? args.pop : {}
-#!      opt[:positive] ||= "%.#{opt[:precision]||2}f"
-#!      pattern =
-#!      if value.nil?
-#!        value = 0
-#!        opt[:nil] || opt[:positive]
-#!      else
-#!        case value <=> 0
-#!        when 1 then opt[:positive]
-#!        when 0 then opt[:zero] || opt[:positive]
-#!        else
-#!          value = -value if opt[:negative] && opt[:negative] != opt[:positive]
-#!          opt[:negative] || opt[:positive]
-#!        end
-#!      end
-#!      value = self.format_money( value, pattern, opt)
-#!      value = opt[:unit]+value if opt[:unit]
-#!      value.gsub!(/\./,opt[:separator]) if opt[:separator]
-#!      if opt[:delimiter] && (m = value.match(/^(\D*)(\d+)(.*)/))
-#!        # Adapted From Rails' ActionView::Helpers::NumberHelper
-#!        n = m[2].gsub(/(\d)(?=(\d\d\d)+(?!\d))/, "\\1#{opt[:delimiter]}")
-#!        value=m[1]+n+m[3]
-#!      end
-#!      value
-#!    end
-#!
-#!    def self.integer_to_float(value, *args)
-#!      opt = args.last.is_a?(Hash) ? args.pop : {}
-#!      return (opt[:blank]||nil) if value.nil?
-#!      value = 1.0 * value / (10**(opt[:precision]||2))
-#!    end
-#!
-#!    # Returns the integer of the given money string. Uses relevant options from #easy_money
-#!    def self.money_to_integer(value, *args)
-#!      opt = args.last.is_a?(Hash) ? args.pop : {}
-#!      value = value.gsub(opt[:delimiter],'') if opt[:delimiter]
-#!      value = value.gsub(opt[:separator],'.') if opt[:separator]
-#!      value = value.gsub(/^[^\d\.\-\,]+/,'')
-#!      return (opt[:blank]||nil) unless value =~ /\d/
-#!      m = value.to_s.match(opt[:negative_regex]||/^(-?)(.+\d)\s*cr/i)
-#!      value = value.match(/^-/) ? m[2] : "-#{m[2]}" if m && m[2]
-#!
-#!      # Money string ("123.45") to proper integer withough passing through the float transformation
-#!      match = value.match(/(-?\d*)\.?(\d*)/)
-#!      return 0 unless match
-#!      value = match[1].to_i * (10 ** (opt[:precision]||2))
-#!      cents = match[2]
-#!      cents = cents + '0' while cents.length < (opt[:precision]||2)
-#!      cents = cents.to_s[0,opt[:precision]||2]
-#!      value += cents.to_i * (value<0 ? -1 : 1)
-#!      value
-#!    end
-#!
-#!    # Returns the integer (cents) value from a Float
-#!    def self.float_to_integer(value, *args)
-#!      opt = args.last.is_a?(Hash) ? args.pop : {}
-#!      return (opt[:blank]||nil) if value.nil?
-#!      value = (value.to_f*(10**((opt[:precision]||2)+1))).to_i/10 # helps rounding 4.56 -> 455 ouch!
-#!    end
-#!
-#!    # Replacing the sprintf function to deal with money as float. "... %[flags]m ..."
-#!    def self.format_money(value, pattern="%.2m", *args)
-#!      opt = args.last.is_a?(Hash) ? args.pop : {}
-#!      sign = value < 0 ? -1 : 1
-#!      dollars, cents = value.abs.divmod( 10 ** (opt[:precision]||2))
-#!      dollars *= sign
-#!      parts = pattern.match(/^(.*)%([-\. \d+0]*)[fm](.*)/)
-#!      return pattern unless parts
-#!      intdec = parts[2].match(/(.*)\.(\d*)/)
-#!      dprec, cprec = intdec ? [intdec[1], intdec[2]] : ['', '']
-#!      dollars = sprintf("%#{dprec}d", dollars)
-#!      cents = '0' + cents.to_s while cents.to_s.length < (opt[:precision]||2)
-#!      cents = cents.to_s[0,cprec.to_i]
-#!      cents = cents + '0' while cents.length < cprec.to_i
-#!      value = parts[1] + "#{(dollars.to_i==0 && sign==-1) ? '-' : '' }#{dollars}#{cents>' '? '.':''}#{cents}" + parts[3]
-#!      value
-#!    end
-

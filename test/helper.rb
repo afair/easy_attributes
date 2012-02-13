@@ -17,3 +17,11 @@ class Sample
   attr_enum :lifestage, :baby, :toddler, :child, :teen, :adult, :elderly, :dead
   attr_shared status1: :status2
 end
+
+def format_bytes_case(*args)
+  EasyAttributes::Definition.new(:testcase).format_bytes(*args)
+end
+
+def parse_bytes_case(*args)
+  EasyAttributes::Definition.new(:testcase).parse_bytes(*args)
+end

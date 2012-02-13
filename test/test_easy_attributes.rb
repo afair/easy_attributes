@@ -8,7 +8,7 @@ class TestEasyAttributes < Test::Unit::TestCase
   attr_enum   :tas, :n1, :n2, nil, :n4, 8, :n8
   attr_values :tav, :k1=>1, :k2=>2, :k3=>3
   attr_shared :status, status1: :status
-#  attr_bytes  :bw
+  attr_bytes  :bw
 #  attr_money  :amount
 
   def test_definitions
@@ -19,8 +19,8 @@ class TestEasyAttributes < Test::Unit::TestCase
     self.tas_sym = :n1
     assert_equal self.tas, 1
     assert_equal self.tas_sym, :n1
-    assert_equal TestEasyAttributes.tas_definition.value_of(:n4), 4
-    assert_equal TestEasyAttributes.tas_definition.value_of(:n8), 8
+    assert_equal TestEasyAttributes.easy_attribute_definition(:tas).value_of(:n4), 4
+    assert_equal TestEasyAttributes.easy_attribute_definition(:tas).value_of(:n8), 8
   end
 
   def test_attr_values
@@ -29,12 +29,12 @@ class TestEasyAttributes < Test::Unit::TestCase
     self.tav_sym = :k2
     assert_equal tav, 2
     assert_equal tav_sym, :k2
-    assert_equal tav_in(k2), true
-    assert_equal tav_in(k1, :k3), false
+    assert_equal tav_in(:k2), true
+    assert_equal tav_in(:k1, :k3), false
   end
 
   def test_attr_shared
-    puts EasyAttributes::Definition.definitions
+    #puts EasyAttributes::Definition.definitions
     self.status_sym = :forsale
     assert_equal self.status, 1
     self.status_sym = :deleted
@@ -43,33 +43,33 @@ class TestEasyAttributes < Test::Unit::TestCase
     assert_equal self.status1, 1
   end
 
-#  def test_attr_bytes
-#    self.bw = 1024
-#    assert_equal bw, 1024
-#    assert_equal bw_bytes(:KiB, :precision=>0), "1 KiB"
-#    self.bw = [1, :kb]
-#  end
-#  
-#  def test_format_bytes
-#    EasyAttributes::Config.kb_size = :both
-#    assert_equal EasyAttributes.format_bytes( 900 ), "900 B"
-#    assert_equal EasyAttributes.format_bytes( 1000 ), "1 KB"
-#    assert_equal EasyAttributes.format_bytes( 12345 ), "12 KiB"
-#    assert_equal EasyAttributes.format_bytes( 123456789 ), "117 MiB"
-#    assert_equal EasyAttributes.format_bytes( 9999999999 ), "9.31 GiB"
-#    assert_equal EasyAttributes.format_bytes( 123456789,  :KiB ), "120563.271 KiB"
-#    assert_equal EasyAttributes.format_bytes( 123456789,  :KiB, 1 ), "120563.3 KiB"
-#    assert_equal EasyAttributes.format_bytes( 123456789,  :KiB, 0 ), "120563 KiB"
-#  end
-#  
-#  def test_parse_bytes
-#    EasyAttributes::Config.kb_size=:both
-#    assert_equal EasyAttributes.parse_bytes( "1.5 KiB" ), 1536
-#    assert_equal EasyAttributes.parse_bytes( "1 gb" ), EasyAttributes::GB
-#    assert_equal EasyAttributes.parse_bytes( "1kb", :kb_size=>1000 ), 1000
-#    assert_equal EasyAttributes.parse_bytes( "1kb", :kb_size=>1024 ), 1024
-#  end
-#  
+  def test_attr_bytes
+    self.bw = 1024
+    assert_equal bw, 1024
+    assert_equal bw_bytes(:KiB, :precision=>0), "1 KiB"
+    self.bw = [1, :kb]
+  end
+
+  def test_format_bytes
+    EasyAttributes::Config.kb_size = :both
+    assert_equal format_bytes_case( 900 ), "900 B"
+    assert_equal format_bytes_case( 1000 ), "1 KB"
+    assert_equal format_bytes_case( 12345 ), "12 KiB"
+    assert_equal format_bytes_case( 123456789 ), "118 MiB" # 117.7
+    assert_equal format_bytes_case( 9999999999, precision:2 ), "9.31 GiB"
+    assert_equal format_bytes_case( 123456789,  :KiB, precision:3 ), "120563.271 KiB"
+    assert_equal format_bytes_case( 123456789,  :KiB, precision:1 ), "120563.3 KiB"
+    assert_equal format_bytes_case( 123456789,  :KiB, precision:0 ), "120563 KiB"
+  end
+
+  def test_parse_bytes
+    EasyAttributes::Config.kb_size=:both
+    assert_equal parse_bytes_case( "1.5 KiB" ), 1536
+    assert_equal parse_bytes_case( "1 gb" ), 1_000_000_000
+    assert_equal parse_bytes_case( "1kb", :kb_size=>1000 ), 1000
+    assert_equal parse_bytes_case( "1kb", :kb_size=>1024 ), 1024
+  end
+
 #  def test_include
 #    sample = Sample.new
 #    flunk "no price_money method" unless sample.respond_to?(:price_money)
@@ -141,7 +141,7 @@ class TestEasyAttributes < Test::Unit::TestCase
 #    assert EasyAttributes.integer_to_float(nil    ) == nil
 #    assert EasyAttributes.integer_to_float(9999888, :precision=>3 ) == 9999.888
 #  end
-#  
+#
 #  def test_format_money
 #    assert EasyAttributes.format_money(12345) == '123.45'
 #    assert EasyAttributes.format_money(12345, "%07.2m") == '0000123.45'
@@ -152,5 +152,5 @@ class TestEasyAttributes < Test::Unit::TestCase
 #    assert EasyAttributes.format_money(-12345, "%07.1m") == '-000123.4'
 #    assert EasyAttributes.format_money(-1) == '-0.01'
 #  end
-  
+
 end

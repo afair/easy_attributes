@@ -46,8 +46,8 @@ module EasyAttributes
     # attribute - The name of the attribute
     # definition - The optional definition list passed to initialize
     #              A has of symbol_name => values
-    #              Make sure the type of value matches your use, 
-    #              either a string "42" or integer "42".to_i 
+    #              Make sure the type of value matches your use,
+    #              either a string "42" or integer "42".to_i
     # attr_options - A optiona; Hash of attribute names to a hash of additional info
     #              {status:{help:"...", title:"Status"}}
     #
@@ -204,7 +204,7 @@ module EasyAttributes
     # Public: Returns true if the current value of the attribute is (or is in the list of
     # values) referenced by their symbolic names
     #
-    # value   - The value to match 
+    # value   - The value to match
     # symbols - array of symbolic value names, eg. :active, :inactive
     #
     # Examples
@@ -304,50 +304,66 @@ module EasyAttributes
     end
 
     ###########################################################################
-    # Official Definitions for kilobyte and kibibyte quantity prefixes
+    # Official Definitions for kilobyte and kibibyte quantity units
     ###########################################################################
     KB =1000; MB =KB **2; GB= KB **3; TB =KB **4; PB =KB **5; EB =KB **6; ZB =KB **7; YB =KB **8
     KiB=1024; MiB=KiB**2; GiB=KiB**3; TiB=KiB**4; PiB=KiB**5; EiB=KiB**6; ZiB=KiB**7; YiB=KiB**8
-    BINARY_PREFIXES  = {:B=>1,:KiB=>KiB,:MiB=>MiB,:GiB=>GiB,:TiB=>TiB,:PiB=>PiB,:EiB=>EiB,:ZiB=>ZiB,:TiB=>YiB}
-    DECIMAL_PREFIXES = {:B=>1,:KB=>KB,  :MB=>MB,  :GB=>GB,  :TB=>TB,  :PB=>PB,  :EB=>EB,  :ZB=>ZB,  :YB=>YB}
-    JEDEC_PREFIXES   = {:B=>1,:KB=>KiB, :MB=>MiB, :GB=>GiB, :TB=>TiB, :PB=>PiB, :EB=>EiB, :ZB=>ZiB, :TB=>YiB}
+    BINARY_UNITS  = {:B=>1,:KiB=>KiB,:MiB=>MiB,:GiB=>GiB,:TiB=>TiB,:PiB=>PiB,:EiB=>EiB,:ZiB=>ZiB,:TiB=>YiB}
+    DECIMAL_UNITS = {:B=>1,:KB=>KB,  :MB=>MB,  :GB=>GB,  :TB=>TB,  :PB=>PB,  :EB=>EB,  :ZB=>ZB,  :YB=>YB}
+    JEDEC_UNITS   = {:B=>1,:KB=>KiB, :MB=>MiB, :GB=>GiB, :TB=>TiB, :PB=>PiB, :EB=>EiB, :ZB=>ZiB, :TB=>YiB}
 
     # Returns a hash of prefix names to decimal quantities for the given setting
-    def self.byte_prefixes(kb_size=0)
+    def self.byte_units(kb_size=0)
       case kb_size
-      when 1000, :decimal, :si then DECIMAL_PREFIXES
-      when :old, :jedec, 1024 then JEDEC_PREFIXES
-      when :new, :iec then BINARY_PREFIXES
-      else DECIMAL_PREFIXES.merge(BINARY_PREFIXES) # Both? What's the least surprise?
+      when 1000, :decimal, :si, :kb, :KB then DECIMAL_UNITS
+      when :old, :jedec, 1024, :kib, :KiB then JEDEC_UNITS
+      when :new, :iec then BINARY_UNITS
+      else DECIMAL_UNITS.merge(BINARY_UNITS) # Both? What's the least surprise?
       end
     end
 
-    # Takes a number of bytes and an optional :unit argument and :precision option, returns a formatted string of units
+    # Public: Formats an integer as a byte-representation
+    #
+    #   v        - Integer value of bytes
+    #   unit     - Optional Unit to use for representation, regardless of magnitude
+    #   opt      - Optional hash of overrides for :kb_size, :precision, etc.
+    #
+    # Example:
+    #   format_bytes(1000, :kb) # => "1 KB"
+    #
+    # Returns a string like "n.nn XB" representing the approximate bytes
+    #
     def format_bytes(v, *args)
-      #prefixes = EasyAttributes.byte_prefixes(opt[:kb_size]||EasyAttributes::Config.kb_size||0)
-      opt = attr_options
-      prefixes = Definition.byte_prefixes(opt[:kb_size]||Config.kb_size||1000)
-      if args.size > 0 && args.first.is_a?(Symbol)
-        (unit, precision) = args
-        v = "%.#{precision||opt[:precision]}f" % (1.0 * v / (prefixes[unit]||1))
+      #puts "&format_bytes(#{v},#{args.inspect})"
+      #units = EasyAttributes.byte_units(opt[:kb_size]||EasyAttributes::Config.kb_size||0)
+      opt = args.last.is_a?(Hash) ? args.pop : {}
+      opt = attr_options.merge(opt)
+      unit = args.shift
+      units = Definition.byte_units(opt[:kb_size]||Config.kb_size||1000)
+      precision = opt[:precision] || attr_options[:precision] || 0
+      vint = v
+
+      if unit
+        units = Definition.byte_units() unless units.has_key?(unit)
+        v = "%.#{precision}f" % (1.0 * v / (units[unit]||1))
+        #puts "format_bytes(#{vint},#{unit},#{precision}) => #{v} #{unit}"
         return "#{v} #{unit}"
-      else
-        precision = args.shift || opt.fetch(:precision) { 2 }
-        prefixes.sort{|a,b| a[1]<=>b[1]}.reverse.each do |pv|
-          next if pv[1] > v
-          v = "%f.10f" % (1.0 * v / pv[1])
-          v = v[0,precision+1] if v =~ /^(\d)+\.(\d+)/ && v.size > (precision+1)
-          v.gsub!(/\.0*$/, '')
-          return "#{v} #{pv[0]}"
-        end
+      end
+
+      units.sort{|a,b| a[1]<=>b[1]}.reverse.each do |pv|
+        next if pv[1] > v
+        v = "%.#{precision}f" % (1.0 * v / pv[1])
+        v.gsub!(/\.0*$/, '')
+        #puts "format_bytes(#{vint}) v=#{v}, p=#{precision}, #{pv.inspect}"
+        return "#{v} #{pv[0]}"
       end
       v.to_s
     end
 
     # Takes a string of "number units" or Array of [number, :units] and returns the number of bytes represented.
     def parse_bytes(v, *args)
-     #opt = EasyAttributes.pop_options(args, :precision=>3)
-      opt = attr_options
+      opt = args.last.is_a?(Hash) ? args.pop : {}
+      opt = attr_options.merge(opt)
       # Handle v= [100, :KB]
       if v.is_a?(Array)
         bytes = v.shift
@@ -357,10 +373,11 @@ module EasyAttributes
       end
 
       if v.downcase =~ /^\s*(?:[\d\.]+)\s*([kmgtpezy]i?b)/i
-        units = ($1.size==2 ? $1.upcase : $1[0,1].upcase+$1[1,1]+$1[2,1].upcase).to_sym
-        prefixes = Definition.byte_prefixes(opt[:kb_size]||Config.kb_size||1000)
-        prefixes = Definition.byte_prefixes(:both) unless prefixes.has_key?(units)
-        bytes *= prefixes[units] if prefixes.has_key?(units)
+        unit = ($1.size==2 ? $1.upcase : $1[0,1].upcase+$1[1,1]+$1[2,1].upcase).to_sym
+        units = Definition.byte_units(opt[:kb_size]||Config.kb_size||1000)
+        units = Definition.byte_units(:both) unless units.has_key?(unit)
+        puts "parse_bytes(#{v}) unit=#{unit} b=#{bytes} * #{units[unit]}"
+        bytes *= units[unit] if units.has_key?(unit)
       end
       (bytes*100).to_i/100
     end
@@ -441,7 +458,14 @@ module EasyAttributes
     # Returns the current kb_size setting
     #
     def self.kb_size
-      @kb_size
+      case @kb_size
+      when :new, :iec then
+        1024
+      when :old, :jedec, :decimal
+        1000
+      else
+        @kb_size
+      end
     end
 
     # Public: Sets the ORM (Object Relational Mapper) to a supported policy
@@ -668,7 +692,7 @@ module EasyAttributes
     # Example
     #
     #   attr_bytes :bandwidth
-    #   attr_bytes :storage, :kb_size=>1000
+    #   attr_bytes :storage, :kb_size=>1000, :precision=>2
     #
     # Adds the following helpers
     #
@@ -690,8 +714,8 @@ module EasyAttributes
 
         # <attribute>_bytes()
         # Returns the symbolic name of the current value of "attribute"
-        define_method("#{attribute}_bytes") do
-          self.class.easy_attribute_definition(attribute).format_bytes(self.send(attribute))
+        define_method("#{attribute}_bytes") do |*args|
+          self.class.easy_attribute_definition(attribute).format_bytes(self.send(attribute), *args)
         end
 
         # <attribute>_bytes=(new_symbol)
@@ -699,16 +723,6 @@ module EasyAttributes
         define_method("#{attribute}_bytes=") do |sym|
           self.send("#{attribute}=", self.class.easy_attribute_definition(attribute).parse_bytes(sym))
         end
-
-        #code += %Q(
-        #  def #{attribute}_bytes
-        #    EasyAttributes::format_bytes(self.#{attribute}, #{self.name}.#{attribute}_definition.options[:#{attribute}] { {} })
-        #  end
-        #  def #{attribute}_bytes=(v)
-        #    self.#{attribute} = 
-        #      EasyAttributes::parse_bytes(v, #{self.name}.#{attribute}_definition.options[:#{attribute}] { {} })
-        #  end
-        #)
       end
 
       #puts code

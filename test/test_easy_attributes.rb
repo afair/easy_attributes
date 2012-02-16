@@ -96,34 +96,34 @@ class TestEasyAttributes < Test::Unit::TestCase
 
 
   def test_integer_to_money
-    assert EasyAttributes::FixedPoint.integer_to_money(123) == '1.23'
-    assert EasyAttributes::FixedPoint.integer_to_money(-12333) == '-123.33'
-    assert EasyAttributes::FixedPoint.integer_to_money(0) == '0.00'
-    assert EasyAttributes::FixedPoint.integer_to_money(nil, :nil=>'?') == '?'
-    assert EasyAttributes::FixedPoint.integer_to_money(-1, :negative=>'%.2f CR') == '0.01 CR'
-    assert EasyAttributes::FixedPoint.integer_to_money(0, :zero=>'free') == 'free'
-    assert EasyAttributes::FixedPoint.integer_to_money(100, :unit=>'$') == '$1.00'
-    assert EasyAttributes::FixedPoint.integer_to_money(100, :separator=>',') == '1,00'
-    assert EasyAttributes::FixedPoint.integer_to_money(12345678900, :separator=>',', :delimiter=>'.') == '123.456.789,00'
-    assert EasyAttributes::FixedPoint.integer_to_money(333, :precision=>3) == '0.333'
-    assert EasyAttributes::FixedPoint.integer_to_money(111, :precision=>1) == '11.1'
-    assert EasyAttributes::FixedPoint.integer_to_money(111, :precision=>0) == '111'
+    assert EasyAttributes::FixedPoint.integer_to_fixed_point(123) == '1.23'
+    assert EasyAttributes::FixedPoint.integer_to_fixed_point(-12333) == '-123.33'
+    assert EasyAttributes::FixedPoint.integer_to_fixed_point(0) == '0.00'
+    assert EasyAttributes::FixedPoint.integer_to_fixed_point(nil, :nil=>'?') == '?'
+    assert EasyAttributes::FixedPoint.integer_to_fixed_point(-1, :negative=>'%.2f CR') == '0.01 CR'
+    assert EasyAttributes::FixedPoint.integer_to_fixed_point(0, :zero=>'free') == 'free'
+    assert EasyAttributes::FixedPoint.integer_to_fixed_point(100, :unit=>'$') == '$1.00'
+    assert EasyAttributes::FixedPoint.integer_to_fixed_point(100, :separator=>',') == '1,00'
+    assert EasyAttributes::FixedPoint.integer_to_fixed_point(12345678900, :separator=>',', :delimiter=>'.') == '123.456.789,00'
+    assert EasyAttributes::FixedPoint.integer_to_fixed_point(333, :precision=>3) == '0.333'
+    assert EasyAttributes::FixedPoint.integer_to_fixed_point(111, :precision=>1) == '11.1'
+    assert EasyAttributes::FixedPoint.integer_to_fixed_point(111, :precision=>0) == '111'
   end
 
   def test_money_to_integer
-    assert EasyAttributes::FixedPoint.money_to_integer('1.23'        ) == 123
-    assert EasyAttributes::FixedPoint.money_to_integer('0.00'        ) == 0
-    assert EasyAttributes::FixedPoint.money_to_integer('-1.23'       ) == -123
-    assert EasyAttributes::FixedPoint.money_to_integer('1.23 CR'     ) == -123
-    assert EasyAttributes::FixedPoint.money_to_integer('$-2.34 CR'   ) == 234
-    assert EasyAttributes::FixedPoint.money_to_integer('   1.234'    ) == 123
-    assert EasyAttributes::FixedPoint.money_to_integer('$1'          ) == 100
-    assert EasyAttributes::FixedPoint.money_to_integer('1'           ) == 100
-    assert EasyAttributes::FixedPoint.money_to_integer(''            ) == nil
-    assert EasyAttributes::FixedPoint.money_to_integer('1,00', :separator=>',',:delimiter=>'.') == 100
-    assert EasyAttributes::FixedPoint.money_to_integer('$123.456.789,00 CR', :separator=>',',:delimiter=>'.') == -12345678900
-    assert EasyAttributes::FixedPoint.money_to_integer('4.44', :precision=>4 ) == 44400
-    assert EasyAttributes::FixedPoint.money_to_integer('4.44', :precision=>0 ) == 4
+    assert EasyAttributes::FixedPoint.fixed_point_to_integer('1.23'        ) == 123
+    assert EasyAttributes::FixedPoint.fixed_point_to_integer('0.00'        ) == 0
+    assert EasyAttributes::FixedPoint.fixed_point_to_integer('-1.23'       ) == -123
+    assert EasyAttributes::FixedPoint.fixed_point_to_integer('1.23 CR'     ) == -123
+    assert EasyAttributes::FixedPoint.fixed_point_to_integer('$-2.34 CR'   ) == 234
+    assert EasyAttributes::FixedPoint.fixed_point_to_integer('   1.234'    ) == 123
+    assert EasyAttributes::FixedPoint.fixed_point_to_integer('$1'          ) == 100
+    assert EasyAttributes::FixedPoint.fixed_point_to_integer('1'           ) == 100
+    assert EasyAttributes::FixedPoint.fixed_point_to_integer(''            ) == nil
+    assert EasyAttributes::FixedPoint.fixed_point_to_integer('1,00', :separator=>',',:delimiter=>'.') == 100
+    assert EasyAttributes::FixedPoint.fixed_point_to_integer('$123.456.789,00 CR', :separator=>',',:delimiter=>'.') == -12345678900
+    assert EasyAttributes::FixedPoint.fixed_point_to_integer('4.44', :precision=>4 ) == 44400
+    assert EasyAttributes::FixedPoint.fixed_point_to_integer('4.44', :precision=>0 ) == 4
   end
 
   def test_float_to_integer
@@ -143,15 +143,15 @@ class TestEasyAttributes < Test::Unit::TestCase
     assert EasyAttributes::FixedPoint.integer_to_float(9999888, :precision=>3 ) == 9999.888
   end
 
-  def test_format_money
-    assert EasyAttributes::FixedPoint.format_money(12345) == '123.45'
-    assert EasyAttributes::FixedPoint.format_money(12345, "%07.2m") == '0000123.45'
-    assert EasyAttributes::FixedPoint.format_money(12345, "%07.3m") == '0000123.450'
-    assert EasyAttributes::FixedPoint.format_money(12345, "%m") == '123'
-    assert EasyAttributes::FixedPoint.format_money(12345, "free") == 'free'
-    assert EasyAttributes::FixedPoint.format_money(-12345) == '-123.45'
-    assert EasyAttributes::FixedPoint.format_money(-12345, "%07.1m") == '-000123.4'
-    assert EasyAttributes::FixedPoint.format_money(-1) == '-0.01'
+  def test_format_fixed_point
+    assert EasyAttributes::FixedPoint.format_fixed_point(12345) == '123.45'
+    assert EasyAttributes::FixedPoint.format_fixed_point(12345, "%07.2m") == '0000123.45'
+    assert EasyAttributes::FixedPoint.format_fixed_point(12345, "%07.3m") == '0000123.450'
+    assert EasyAttributes::FixedPoint.format_fixed_point(12345, "%m") == '123'
+    assert EasyAttributes::FixedPoint.format_fixed_point(12345, "free") == 'free'
+    assert EasyAttributes::FixedPoint.format_fixed_point(-12345) == '-123.45'
+    assert EasyAttributes::FixedPoint.format_fixed_point(-12345, "%07.1m") == '-000123.4'
+    assert EasyAttributes::FixedPoint.format_fixed_point(-1) == '-0.01'
   end
 
 end

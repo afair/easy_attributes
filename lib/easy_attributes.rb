@@ -312,6 +312,12 @@ module EasyAttributes
     DECIMAL_UNITS = {:B=>1,:KB=>KB,  :MB=>MB,  :GB=>GB,  :TB=>TB,  :PB=>PB,  :EB=>EB,  :ZB=>ZB,  :YB=>YB}
     JEDEC_UNITS   = {:B=>1,:KB=>KiB, :MB=>MiB, :GB=>GiB, :TB=>TiB, :PB=>PiB, :EB=>EiB, :ZB=>ZiB, :TB=>YiB}
 
+    # Public: Maps the kb_size into a hash of desired unit_symbol=>bytes.
+    #
+    # kb_size   - For decimal units: 1000, :decimal, :si, :kb
+    #             For binary units : 1024, :jedec, :old, :kib
+    #             Otherwise a hash of combined values is returned
+    #
     # Returns a hash of prefix names to decimal quantities for the given setting
     def self.byte_units(kb_size=0)
       case kb_size
@@ -322,7 +328,7 @@ module EasyAttributes
       end
     end
 
-    # Public: Formats an integer as a byte-representation
+    # Private: Formats an integer as a byte-representation
     #
     #   v        - Integer value of bytes
     #   unit     - Optional Unit to use for representation, regardless of magnitude
@@ -360,7 +366,13 @@ module EasyAttributes
       v.to_s
     end
 
-    # Takes a string of "number units" or Array of [number, :units] and returns the number of bytes represented.
+    # Private: Parses a "1.23 kb" style string and converts into an integer
+    # v       - String to parse of the format "1.23 kb" or so
+    #           Optionally, this can be an array of [1.23, :kb]
+    # options - Hash of options to override defaults
+    #           kb_size:1000
+    #
+    # Returns an integer of the parsed value.
     def parse_bytes(v, *args)
       opt = args.last.is_a?(Hash) ? args.pop : {}
       opt = attr_options.merge(opt)
@@ -379,7 +391,7 @@ module EasyAttributes
         puts "parse_bytes(#{v}) unit=#{unit} b=#{bytes} * #{units[unit]}"
         bytes *= units[unit] if units.has_key?(unit)
       end
-      (bytes*100).to_i/100
+      (bytes*100 + 0.00001).to_i/100
     end
   end
 
@@ -490,13 +502,30 @@ module EasyAttributes
 
   end
 
+  # Private Module: FixedPoint handles integer<->fixed-point numbers
+  # Fixed-Point rules are a hash of these values
+  #   :units          Use this as an alternative suffix name to the money methods ('dollars' gives 'xx_dollars')
+  #   :precision      The number of digits implied after the decimal, default is 2
+  #   :separator      The character to use after the integer part, default is '.'
+  #   :delimiter      The character to use between every 3 digits of the integer part, default none
+  #   :positive       The sprintf format to use for positive numbers, default is based on precision
+  #   :negative       The sprintf format to use for negative numbers, default is same as :positive
+  #   :zero           The sprintf format to use for zero, default is same as :positive
+  #   :nil            The sprintf format to use for nil values, default none
+  #   :unit           Prepend this to the front of the money value, say '$', default none
+  #   :blank          Return this value when the money string is empty or has no digits on assignment
+  #   :negative_regex A Regular Expression used to determine if a number is negative (and without a - sign)
   module FixedPoint
     ###########################################################################
     # EasyAttributes Fixed-Precision as Integer Helpers
     ###########################################################################
 
-    # Returns the money string of the given integer value. Uses relevant options from #easy_money
-    def self.integer_to_money(value, *args)
+    # Private: Formats an integer value as the defined fixed-point representation
+    # value  - integer representation of number
+    # rules    - hash of fixed-point conversion rules
+    #
+    # Returns the fixed-point representation as a string for editing
+    def self.integer_to_fixed_point(value, *args)
       opt = args.last.is_a?(Hash) ? args.pop : {}
       opt[:positive] ||= "%.#{opt[:precision]||2}f"
       pattern =
@@ -512,7 +541,7 @@ module EasyAttributes
           opt[:negative] || opt[:positive]
         end
       end
-      value = self.format_money( value, pattern, opt)
+      value = self.format_fixed_point( value, pattern, opt)
       value = opt[:unit]+value if opt[:unit]
       value.gsub!(/\./,opt[:separator]) if opt[:separator]
       if opt[:delimiter] && (m = value.match(/^(\D*)(\d+)(.*)/))
@@ -523,14 +552,24 @@ module EasyAttributes
       value
     end
 
+    # Private: Converts the integer into a float value with the given fixed-point definition
+    #
+    # value    - integer to convert
+    # rules    - hash of fixed-point conversion rules
+    #
+    # Returns a float of the converted value
     def self.integer_to_float(value, *args)
       opt = args.last.is_a?(Hash) ? args.pop : {}
       return (opt[:blank]||nil) if value.nil?
       value = 1.0 * value / (10**(opt[:precision]||2))
     end
 
+    # Private: Takes a string of a fixed-point representation (from editing) and converts it to 
+    # the integer representation according to the passed rules hash
+    # rules    - hash of fixed-point conversion rules
+    #
     # Returns the integer of the given money string. Uses relevant options from #easy_money
-    def self.money_to_integer(value, *args)
+    def self.fixed_point_to_integer(value, *args)
       opt = args.last.is_a?(Hash) ? args.pop : {}
       value = value.gsub(opt[:delimiter],'') if opt[:delimiter]
       value = value.gsub(opt[:separator],'.') if opt[:separator]
@@ -551,6 +590,7 @@ module EasyAttributes
     end
 
     # Returns the integer (cents) value from a Float
+    # rules    - hash of fixed-point conversion rules
     def self.float_to_integer(value, *args)
       opt = args.last.is_a?(Hash) ? args.pop : {}
       return (opt[:blank]||nil) if value.nil?
@@ -558,7 +598,8 @@ module EasyAttributes
     end
 
     # Replacing the sprintf function to deal with money as float. "... %[flags]m ..."
-    def self.format_money(value, pattern="%.2m", *args)
+    # rules    - hash of fixed-point conversion rules
+    def self.format_fixed_point(value, pattern="%.2m", *args)
       opt = args.last.is_a?(Hash) ? args.pop : {}
       sign = value < 0 ? -1 : 1
       dollars, cents = value.abs.divmod( 10 ** (opt[:precision]||2))
@@ -856,13 +897,13 @@ module EasyAttributes
         # <attribute>_fixed()
         # Returns the symbolic name of the current value of "attribute"
         define_method("#{attribute}_#{suffix}") do
-          FixedPoint::integer_to_money(send(attribute), self.class.easy_attribute_definition(attribute).attr_options)
+          FixedPoint::integer_to_fixed_point(send(attribute), self.class.easy_attribute_definition(attribute).attr_options)
         end
 
         # <attribute>_fixed=(new_value)
         # Sets the value of "attribute" to the associated value of the passed symbolic name
         define_method("#{attribute}_#{suffix}=") do |val|
-          self.send("#{attribute}=", FixedPoint::money_to_integer(val,
+          self.send("#{attribute}=", FixedPoint::fixed_point_to_integer(val,
             self.class.easy_attribute_definition(attribute).attr_options))
         end
 

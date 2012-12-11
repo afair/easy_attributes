@@ -52,6 +52,18 @@ Options:
   :scope=> true        # defines: scope :setting, where(:field=>value)
   :naamed_scope=> true # defines: named_scope :setting, :conditions=>{:field=>value}
 
+== attr_shared 
+
+You can also share definitions across models, and declare definitions dynamically (such as at application
+initialization time).
+
+  defn = EasyAttributes::Definition.find_or_create(:attribute_name)
+  defn.add_symbol(:symbol, 123, role:'admin', name:'value', title:'Value Description')
+
+  attr_shared :status                     # Maps our status to an already-declared name
+  attr_shared :status => :shared_status   # Maps our status to another shared named
+  attr_shared employee_status:Employee.status_definition()  # Maps to another class' definition
+
 == attr_enum 
 
 List all symbolic values in order with a given :start (default zero) and :step (default 1) option

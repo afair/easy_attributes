@@ -700,7 +700,7 @@ module EasyAttributes
     #
     # Exanples
     #
-    #   attr_shared :status, :role, widget_type: :general_type
+    #   attr_shared :status, :role, widget_type: :general_type, colname: :sharedname
     #   attr_shared employee_status:Employee.status_definition()
     #
     # Calls attr_values with each definition

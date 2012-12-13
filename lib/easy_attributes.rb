@@ -43,7 +43,7 @@ module EasyAttributes
     # Public: Returns an existing or new definition for the atribute name
     # Call this method to define a global or shared setting
     #
-    # attribute - The name of the attribute
+    # attribute  - The name of the attribute
     # definition - The optional definition list passed to initialize
     #              A has of symbol_name => values
     #              Make sure the type of value matches your use,
@@ -53,9 +53,12 @@ module EasyAttributes
     #
     # Examples
     #
-    #   Definition.find_or_create(:status).add_symbol(:retired, 3)
-    #   Definition.find_or_create(:status, active:1, inactive:2)
-    #   Definition.find_or_create(:storage, {}, {kb_size:1000})
+    #   defn = Definition.find_or_create(:status).add_symbol(:retired, 3)
+    #   defn = Definition.find_or_create(:status, active:1, inactive:2)
+    #   defn = Definition.find_or_create(:storage, {}, {kb_size:1000})
+    #   defn.values #=> {value=>:symbol,...}
+    #   defn.symbols #=> {:symbol=>:value,...}
+    #
     #
     # Returns an existing or new instance of Definition
     #
@@ -347,7 +350,7 @@ module EasyAttributes
       unit = args.shift
       units = Definition.byte_units(opt[:kb_size]||Config.kb_size||1000)
       precision = opt[:precision] || attr_options[:precision] || 0
-      vint = v
+      #vint = v
 
       if unit
         units = Definition.byte_units() unless units.has_key?(unit)
@@ -564,7 +567,7 @@ module EasyAttributes
       value = 1.0 * value / (10**(opt[:precision]||2))
     end
 
-    # Private: Takes a string of a fixed-point representation (from editing) and converts it to 
+    # Private: Takes a string of a fixed-point representation (from editing) and converts it to
     # the integer representation according to the passed rules hash
     # rules    - hash of fixed-point conversion rules
     #
@@ -731,7 +734,7 @@ module EasyAttributes
       attribute = attribute.to_sym
       @easy_attribute_definitions ||= {}
       @easy_attribute_definitions[attribute] = defn
-      name = "#{self.name}##{attribute}"
+      #name = "#{self.name}##{attribute}"
       opt = defn.options
       code = ''
 
@@ -752,16 +755,29 @@ module EasyAttributes
       # Class Methods
       #------------------------------------------------------------------------
 
-      # Returns the definition of the passed Easy Attribute name
+      # Adds once to class: Returns the EasyAttribute::Definition of the passed
+      # Easy Attribute name
       unless self.respond_to?(:easy_attribute_definition)
         define_singleton_method(:easy_attribute_definition) do |attrib|
           @easy_attribute_definitions.fetch(attrib.to_sym) { raise "EasyAttribute #{attrib} not found" }
         end
       end
 
-      # Returns an array of (HTML Select) option pairs
+      # <attribute>_options() Returns an array of (HTML Select) option pairs
+      # => [["Option Name", :symbol], ...]
       define_singleton_method("#{attribute}_options") do |*args|
         easy_attribute_definition(attribute).select_option_symbols(*args)
+      end
+
+      # <attribute>_of(:sym [,:default_sym]) Returns the symbol/value hash for the attribute
+      define_singleton_method("#{attribute}_of") do |*args, &block|
+        easy_attribute_definition(attribute).symbols.fetch(args.first.to_sym) do |sym| 
+          if args.size>1
+            easy_attribute_definition(attribute).symbols.fetch(args[1].to_sym, &block)
+          else
+            raise "#{attribute} symbolic name #{sym} not found" 
+          end
+        end
       end
 
       #------------------------------------------------------------------------
@@ -798,7 +814,7 @@ module EasyAttributes
         self.class.easy_attribute_definition(attribute).cmp(self.send(attribute),other)
       end
 
-      # <attribute>value()
+      # <attribute>_value()
       # Experimental for the EasyAttributes::Value class, getter and setter methods
       define_method("#{attribute}_value") do
         self.class.easy_attribute_definition(attribute).value(self.send(attribute))
@@ -841,8 +857,8 @@ module EasyAttributes
 
         # <attribute>_bytes()
         # Returns the symbolic name of the current value of "attribute"
-        define_method("#{attribute}_bytes") do |*args|
-          self.class.easy_attribute_definition(attribute).format_bytes(self.send(attribute), *args)
+        define_method("#{attribute}_bytes") do |*bargs|
+          self.class.easy_attribute_definition(attribute).format_bytes(self.send(attribute), *bargs)
         end
 
         # <attribute>_bytes=(new_symbol)

@@ -58,7 +58,7 @@ You can also share definitions across models, and declare definitions dynamicall
 initialization time).
 
   defn = EasyAttributes::Definition.find_or_create(:attribute_name)
-  defn.add_symbol(:symbol, 123, role:'admin', name:'value', title:'Value Description')
+  defn.add_symbol(:shared_status, 123, role:'admin', name:'value', title:'Value Description')
 
   attr_shared :status                     # Maps our status to an already-declared name
   attr_shared :status => :shared_status   # Maps our status to another shared named

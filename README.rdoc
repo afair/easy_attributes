@@ -48,9 +48,29 @@ will define:
     :greater_than, :gt, :greater_than_or_equal, :ge, :less_than, :lt, :less_than_or_equal, :le
   field_is?(:between, :name1, :name2) # true if the value is between the corresponding values
 
-== attr_sequence 
+Options:
+  :scope=> true        # defines: scope :setting, where(:field=>value)
+  :naamed_scope=> true # defines: named_scope :setting, :conditions=>{:field=>value}
 
-sets up a attr_values with the sequential numbering, by default starting at 1 incrementing by 1
+== attr_shared 
+
+You can also share definitions across models, and declare definitions dynamically (such as at application
+initialization time).
+
+  defn = EasyAttributes::Definition.find_or_create(:attribute_name)
+  defn.add_symbol(:shared_status, 123, role:'admin', name:'value', title:'Value Description')
+
+  attr_shared :status                     # Maps our status to an already-declared name
+  attr_shared :status => :shared_status   # Maps our status to another shared named
+  attr_shared employee_status:Employee.status_definition()  # Maps to another class' definition
+
+== attr_enum 
+
+List all symbolic values in order with a given :start (default zero) and :step (default 1) option
+* Use nil as a placeholder to comsume an unused value
+* Reset the value for the next symbol by specifying an integer value in the sequence.
+
+  attr_enum :month, 1, :jan, 5, :apr, :may, nil, :jul, ..., :start=>1, :step=>1
 
 == attr_bytes
 

@@ -185,4 +185,4 @@ This is a synonym for attr_money, where it represents a float-as-integer
 
 == Copyright
 
-Copyright (c) 2010 Allen Fair. See LICENSE for details.
+Copyright (c) 2012 Allen Fair. See LICENSE for details.

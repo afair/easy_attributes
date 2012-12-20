@@ -51,8 +51,10 @@ will define:
   field_is?(:name, :name, ...)  # true if value matches a given symbol
   field_is?(:greater_than, :name) # true if the value is greater than the value of :name
     The first argument can be one of:
-    :greater_than, :gt, :greater_than_or_equal, :ge, :less_than, :lt, :less_than_or_equal, :le
+    :greater_than, :gt, :greater_<Up>than_or_equal, :ge, :less_than, :lt, :less_than_or_equal, :le
   field_is?(:between, :name1, :name2) # true if the value is between the corresponding values
+  MyClass.field_of(:name) #=> value
+  MyClass.options      #=> [["Option Name", :symbol], ...] ## Suitable for HTML <option> list
 
 Options:
   :scope=> true        # defines: scope :setting, where(:field=>value)

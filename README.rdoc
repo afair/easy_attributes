@@ -4,7 +4,11 @@ Easy Attributes is a Ruby DSL to give more control to attributes. It provides a 
 and conversions to bytes and float-as-integer (money, frequencies, Ratings, etc.) 
 / fixed-decimal precision as integer (See the easy_money gem).
 
+It's humble, simple, just meant to work.
+
 Tested with ruby 1.8 & 1.9
+
+Woops! The gem version 0.2 bring a new interface and API. if you have issues, remember your version the gem in your Gemfile (~0.1.3)
 
 == Usage
 

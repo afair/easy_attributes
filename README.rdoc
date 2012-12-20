@@ -1,10 +1,14 @@
 = easy_attributes
 
-Easy Attributes is a Ruby DSL to give more control to attributes. Tested with ruby 1.87 & 1.9.2
+Easy Attributes is a Ruby DSL to give more control to attributes. It provides a unique attribute enum setup,
+and conversions to bytes and float-as-integer (money, frequencies, Ratings, etc.) 
+/ fixed-decimal precision as integer (See the easy_money gem).
+
+Tested with ruby 1.8 & 1.9
 
 == Usage
 
-Easy Attributes works in any Ruby class, it does not require Active Record or other ORM. 
+Easy Attributes works in any Ruby class, it does not require Active Record or other ORM.
 
 First, install this from rubygems.org
  gem install easy_attributes
@@ -12,11 +16,11 @@ First, install this from rubygems.org
 Next, you need to configure your app to use it, by either:
  require 'rubygems'                 # Ruby application, no framework
  require 'easy_attributes'          #
- 
+
  config.gem 'easy_attributes'       # Rails 2.x, in your ./config/environment.rb
 
  gem 'easy_attributes'              # Rails 3.x, in your ./Gemfile
- 
+
 Configuration:
   EasyAttributes::Config.orm = :active_model   # will generate some validations, etc.
   EasyAttributes::Config.load(filename)        # Loads a file of column/value/names/descriptions
@@ -26,14 +30,16 @@ Declaration:
 
  class Record < ObjectRelationalMapperOfChoice
    include EasyAttributes
-   
+
    attr_values :field, :name=>'value', :name=>'value', ... :validate=>:active_record, :required=>true, :like=>'other' ...
    attr_sequence  :field, :name, :name, ... ,:start=>1, :step=>1
+   attr_shared, :field, field2: :shared_field
    attr_money  :amount, :units=>"dollars", :unit=>'$', :negative=>'%.2f CR'
+   attr_fixed  :rating
    attr_bytes  :bandwidth
  end
- 
-== attr_values 
+
+== attr_values
 
 will define:
   field()              # => value  ### if orm == :attr, attr_accessor will be installed for the attribute
@@ -44,7 +50,7 @@ will define:
   field_is?(:name)     # true if :name matches current value
   field_is?(:name, :name, ...)  # true if value matches a given symbol
   field_is?(:greater_than, :name) # true if the value is greater than the value of :name
-    The first argument can be one of: 
+    The first argument can be one of:
     :greater_than, :gt, :greater_than_or_equal, :ge, :less_than, :lt, :less_than_or_equal, :le
   field_is?(:between, :name1, :name2) # true if the value is between the corresponding values
 
@@ -52,7 +58,7 @@ Options:
   :scope=> true        # defines: scope :setting, where(:field=>value)
   :naamed_scope=> true # defines: named_scope :setting, :conditions=>{:field=>value}
 
-== attr_shared 
+== attr_shared
 
 You can also share definitions across models, and declare definitions dynamically (such as at application
 initialization time).
@@ -64,7 +70,7 @@ initialization time).
   attr_shared :status => :shared_status   # Maps our status to another shared named
   attr_shared employee_status:Employee.status_definition()  # Maps to another class' definition
 
-== attr_enum 
+== attr_enum
 
 List all symbolic values in order with a given :start (default zero) and :step (default 1) option
 * Use nil as a placeholder to comsume an unused value
@@ -81,7 +87,7 @@ now defined as 1000 bytes, and a kibibyte (KiB) is the 1024 quantity, you wan to
   EasyAttributes::Config.kb_size = 1024   # Uses KB units as 1KB = 1024 bytes
   EasyAttributes::Config.kb_size = :new   # Uses KiB units as 1KiB = 1024 bytes (DEFAULT)
   EasyAttributes::Config.kb_size = :both  # Combines usage of KB (1000) and KiB (1024) units (Watch out!)
-  
+
 attr_bytes creates the following methods for a :bandwidth attribute
 
   bandwidth_bytes = "1 KB"                # => 1024
@@ -91,9 +97,9 @@ attr_bytes creates the following methods for a :bandwidth attribute
 
 == attr_money
 
-is the inclusion of my easy_money gem 
+is the inclusion of my easy_money gem
 
-Mixin the EasyAttributes module into the (model) class you need, and declare the 
+Mixin the EasyAttributes module into the (model) class you need, and declare the
 attributes (columns) you wish you have the attr_money helpers
 
  class Ledger
@@ -109,13 +115,13 @@ attributes (columns) you wish you have the attr_money helpers
  ledger.amount_money                #=> "1.00"
  ledger.amount_money = "-123.45"
  ledger.amount                      #=> -12345 (cents)
- ledger.amount_money(:negative=>'%.2f CR', :zero=>'Free') # Uses these formats 
+ ledger.amount_money(:negative=>'%.2f CR', :zero=>'Free') # Uses these formats
  ledger.amount_dollars              #=> "$123.45 CR"
 
  # Track the bets of the Gamesters of Triskelion on their drill thrall competitions.
  class ProviderWagers < ActiveRecord::Base
    include EasyAttributes
-   attr_money :quatloos, :units=>'quatloos', :precision=>3, 
+   attr_money :quatloos, :units=>'quatloos', :precision=>3,
      :zero=>'even', :nil=>'no bet', :negative=>'%.3f Loss', :unit=>'Q',
      :negative_regex=>/^(-?)(.+\d)\s*Loss/i
                                     # creates amount_quatloos(), amount_quatloos=()
@@ -142,8 +148,8 @@ Options for attr_money calls:
 You can also call or build your own custom conversions. Ensure that
 you can convert between the integer and money forms if you need to.
 
-The "money" type is a string, suitable for human editing, and will convert back into 
-integer type. If you override the formatting options, test that your money result 
+The "money" type is a string, suitable for human editing, and will convert back into
+integer type. If you override the formatting options, test that your money result
 string will convert properly back to the original integer value.
 
   include EasyAttributes
@@ -159,9 +165,13 @@ string will convert properly back to the original integer value.
 
 The options to these methods are the same as the #attr_money declarations
 
+== attr_fixed
+
+This is a synonym for attr_money, where it represents a float-as-integer 
+(or fixed-decimal precision as integer) formatting.
 
 == Note on Patches/Pull Requests
- 
+
 * Fork the project.
 * Make your feature addition or bug fix.
 * Add tests for it. This is important so I don't break it in a

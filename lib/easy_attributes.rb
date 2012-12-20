@@ -632,7 +632,7 @@ module EasyAttributes
   #     attr_defined :attr, :attr=>:defined_attr
   #     attr_bytes   :attr, ..., :base=>2
   #     attr_money   :attr, :precision=>2
-  #     attr_fixed_point :attr, :precision=>2
+  #     attr_fixed   :attr, :precision=>2
   #############################################################################
   module ClassMethods
 
@@ -887,8 +887,8 @@ module EasyAttributes
     #       :negative_regex - A Regular Expression used to determine if a number is negative (and without a - sign)
     #
     # Examples:
-    #   attr_fixed_point :gpa, precision:1
-    #   attr_fixed_point :price, precision:2
+    #   attr_fixed :gpa, precision:1
+    #   attr_fixed :price, precision:2
     #
     # Adds the following helpers
     #
@@ -897,7 +897,7 @@ module EasyAttributes
     #   gpa_float()               #=> 3.8
     #
     # Returns nothing
-    def attr_fixed_point(*args)
+    def attr_fixed(*args)
       @easy_attribute_definitions ||= {}
       opt = args.last.is_a?(Hash) ? args.pop : {}
       suffix = opt.fetch(:method_suffix) { 'fixed' }
@@ -931,10 +931,10 @@ module EasyAttributes
       end
     end
 
-    # Public: Alias of attr_fixed_point for a money type with suffix of 'money' and precision of 2.
+    # Public: Alias of attr_fixed for a money type with suffix of 'money' and precision of 2.
     #
     # args       - list of money attributes
-    # options    - hash of attr_fixed_point options.
+    # options    - hash of attr_fixed options.
     #
     # Examples:
     #   attr_money :price
@@ -950,7 +950,7 @@ module EasyAttributes
       opt = args.last.is_a?(Hash) ? args.pop : {}
       opt = {method_suffix:'money', precision:2}.merge(opt)
       args << opt
-      attr_fixed_point(*args)
+      attr_fixed(*args)
     end
 
   end # EasyAttributes::ClassMethods

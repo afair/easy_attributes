@@ -34,7 +34,16 @@ module EasyAttributes
   end
 
   #############################################################################
-  # EasyAttributes::Definition - Class of a attribute value definition
+  # EasyAttributes::Definition - Class of a attribute values definition
+  # 
+  #   attribute    - symbolic name of the attribute, field, or column.
+  #   symbols      - Hash of {symbolic_value:value, ...}
+  #   values       - Hash of {value => :symbolic_value, ...}
+  #   options      - Hash of {option_name:value} for attribute settings
+  #   attr_options - Hash of {value_name: {option_name:value, ...}, e.g.
+  #                          :name  - Alternate text for the value name
+  #                          :title - Alternate text for value definition
+  #                          :role  - Identifier for a role allowed to set/see
   #############################################################################
   class Definition
     include Enumerable
@@ -48,7 +57,7 @@ module EasyAttributes
     #              A has of symbol_name => values
     #              Make sure the type of value matches your use,
     #              either a string "42" or integer "42".to_i
-    # attr_options - A optiona; Hash of attribute names to a hash of additional info
+    # attr_options - A optional Hash of attribute names to a hash of additional info
     #              {status:{help:"...", title:"Status"}}
     #
     # Examples
@@ -99,7 +108,8 @@ module EasyAttributes
     # Public: Create an attribute definition
     #
     # symbols - Hash of {symbol:value,...} for the attribute, or
-    #         - Array of enum definitions for the attribute
+    #         - Array of enum definitions for the attribute, or
+    #         - Hash of {value:value, title:text, name:text, option_name:etc}
     # options - Hash of {name:value,...} to track for the attribute. Optional.
     #           attr_options: {attribute: {....}, ...}
     #
@@ -111,9 +121,20 @@ module EasyAttributes
     def define(*args)
       return define_enum(*args) unless args.first.is_a?(Hash)
 
-      symbols = Hash[* args.first.collect {|k,v| [k.to_sym, v]}.flatten]
+      #symbols = Hash[* args.first.collect {|k,v| [k.to_sym, v]}.flatten]
+      symbols = {}
+      options = {}
+      args.first.each do |k,v|
+         if v.is_a?(Hash)
+           symbols[k.to_sym] = v.delete(:value) {k.to_s}
+           options[k.to_sym] = v
+         else
+           symbols[k.to_sym] = v
+         end
+      end
+
       self.symbols.merge!(symbols)
-      self.values  = Hash[* self.symbols.collect {|k,v| [v, k]}.flatten]
+      self.values = Hash[* self.symbols.collect {|k,v| [v, k]}.flatten]
       self.attr_options.merge!(options)
       #puts "DEFINED #{@attribute} #{self.symbols.inspect}"
     end
@@ -257,22 +278,26 @@ module EasyAttributes
       default
     end
 
-    # Public: Builds a list of [name, value] pairs usefule for HTML select options
-    # The name is the capitalized symbol name.
+    # Public: Builds a list of [option_name, value] pairs useful for HTML select options
+    # Where option_name is the first found of:
+    #   - attr_options[:option_name]
+    #   - attr_options[:title]
+    #   - attr_options[:name]
+    #   - capitalized attribute name
     #
     # attribute - symbolic name of attribute
     #
-    # Returns an array of [name, value] pairs.
+    # Returns an array of [option_name, value] pairs.
     def select_option_values(*args)
       self.symbols.collect {|s,v| [symbol_option_name(s,*args), v]}
     end
 
-    # Private: Builds a list of [name, symbol] pairs usefule for HTML select options
-    # The name is the capitalized symbol name.
+    # Private: Builds a list of [option_name, symbol] pairs useful for HTML select options
+    # Where option_name is as defined in selection_option_values
     #
     # attribute - symbolic name of attribute
     #
-    # Returns an array of [name, symbol] pairs.
+    # Returns an array of [option_name, symbol] pairs.
     def select_option_symbols(*args)
       self.symbols.collect {|s,v| [symbol_option_name(s,*args), s]}
     end
@@ -607,7 +632,7 @@ module EasyAttributes
       sign = value < 0 ? -1 : 1
       dollars, cents = value.abs.divmod( 10 ** (opt[:precision]||2))
       dollars *= sign
-      parts = pattern.match(/^(.*)%([-\. \d+0]*)[fm](.*)/)
+      parts = pattern.match(/^(.*)%([-\. \d+]*)[fm](.*)/)
       return pattern unless parts
       intdec = parts[2].match(/(.*)\.(\d*)/)
       dprec, cprec = intdec ? [intdec[1], intdec[2]] : ['', '']

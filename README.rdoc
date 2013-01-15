@@ -6,7 +6,7 @@ and conversions to bytes and float-as-integer (money, frequencies, Ratings, etc.
 
 It's humble, simple, just meant to work.
 
-Tested with ruby 1.8 & 1.9
+Tested with ruby 1.9
 
 Woops! The gem version 0.2 bring a new interface and API. if you have issues, remember your version the gem in your Gemfile (~0.1.3)
 
@@ -36,6 +36,7 @@ Declaration:
    include EasyAttributes
 
    attr_values :field, :name=>'value', :name=>'value', ... :validate=>:active_record, :required=>true, :like=>'other' ...
+   attr_values :http_status, name:{value:404, name:"Lost", title:"Not Found"}
    attr_sequence  :field, :name, :name, ... ,:start=>1, :step=>1
    attr_shared, :field, field2: :shared_field
    attr_money  :amount, :units=>"dollars", :unit=>'$', :negative=>'%.2f CR'
@@ -43,9 +44,10 @@ Declaration:
    attr_bytes  :bandwidth
  end
 
-== attr_values
+== attr_values :field, name:value, name:{value:value, title:text, name:word}, ...
 
-will define:
+
+Will define:
   field()              # => value  ### if orm == :attr, attr_accessor will be installed for the attribute
   field=(value)        # => value  ### for active_model classes
   field_sym()          # => :name
@@ -76,7 +78,13 @@ initialization time).
   attr_shared :status => :shared_status   # Maps our status to another shared named
   attr_shared employee_status:Employee.status_definition()  # Maps to another class' definition
 
-== attr_enum
+== attr_enum :field, :zero, :one, 8, :nine, ..., start:0, step:1
+
+By default, the first symbol is mapped to 0 (zero), and increments by 1. The :start and
+:step values in the options hash can change those settings. Also, "#next()" is called on
+the start value, so any non-numeric object that supports that call can be used (such as
+a string). A nil in a position will skip that value, and any other non-symbol will reset
+the value of the next symbol to that one.
 
 List all symbolic values in order with a given :start (default zero) and :step (default 1) option
 * Use nil as a placeholder to comsume an unused value

@@ -839,16 +839,16 @@ module EasyAttributes
         self.class.easy_attribute_definition(attribute).cmp(self.send(attribute),other)
       end
 
-      # <attribute>_value()
-      # Experimental for the EasyAttributes::Value class, getter and setter methods
-      define_method("#{attribute}_value") do
-        self.class.easy_attribute_definition(attribute).value(self.send(attribute))
-      end
+      ## <attribute>_value()
+      ## Experimental for the EasyAttributes::Value class, getter and setter methods
+      #define_method("#{attribute}_value") do
+      #  self.class.easy_attribute_definition(attribute).value(self.send(attribute))
+      #end
 
-      # <attribute>value=(new_value_object)
-      define_method("#{attribute}_value=") do |v|
-        self.send("#{attribute}=", self.class.easy_attribute_definition(attribute).value(v))
-      end
+      ## <attribute>value=(new_value_object)
+      #define_method("#{attribute}_value=") do |v|
+      #  self.send("#{attribute}=", self.class.easy_attribute_definition(attribute).value(v))
+      #end
     end
 
     # Public: Adds byte attributes helpers to the class

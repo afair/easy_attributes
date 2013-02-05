@@ -599,6 +599,7 @@ module EasyAttributes
     # Returns the integer of the given money string. Uses relevant options from #easy_money
     def self.fixed_point_to_integer(value, *args)
       opt = args.last.is_a?(Hash) ? args.pop : {}
+      value = value.to_s
       value = value.gsub(opt[:delimiter],'') if opt[:delimiter]
       value = value.gsub(opt[:separator],'.') if opt[:separator]
       value = value.gsub(/^[^\d\.\-\,]+/,'')
@@ -780,13 +781,14 @@ module EasyAttributes
       # Class Methods
       #------------------------------------------------------------------------
 
-      # Adds once to class: Returns the EasyAttribute::Definition of the passed
-      # Easy Attribute name
-      unless self.respond_to?(:easy_attribute_definition)
-        define_singleton_method(:easy_attribute_definition) do |attrib|
-          @easy_attribute_definitions.fetch(attrib.to_sym) { raise "EasyAttribute #{attrib} not found" }
-        end
-      end
+      define_easy_attribute_definition
+      # # Adds once to class: Returns the EasyAttribute::Definition of the passed
+      # # Easy Attribute name
+      # unless self.respond_to?(:easy_attribute_definition)
+      #   define_singleton_method(:easy_attribute_definition) do |attrib|
+      #     @easy_attribute_definitions.fetch(attrib.to_sym) { raise "EasyAttribute #{attrib} not found" }
+      #   end
+      # end
 
       # <attribute>_options() Returns an array of (HTML Select) option pairs
       # => [["Option Name", :symbol], ...]
@@ -851,6 +853,15 @@ module EasyAttributes
       #end
     end
 
+    # Adds once to class: Returns the EasyAttribute::Definition of the passed
+    def define_easy_attribute_definition
+      unless self.respond_to?(:easy_attribute_definition)
+        define_singleton_method(:easy_attribute_definition) do |attrib|
+          @easy_attribute_definitions.fetch(attrib.to_sym) { raise "EasyAttribute #{attrib} not found" }
+        end
+      end
+    end
+
     # Public: Adds byte attributes helpers to the class
     # attr_bytes allows manipultion and display as kb, mb, gb, tb, pb
     # Adds method: attribute_bytes=() and attribute_bytes(:unit, :option=>value )
@@ -869,6 +880,7 @@ module EasyAttributes
     #   bandwidth_bytes=("10 GB") # => 10_000_000_000
     #
     def attr_bytes(*args)
+      define_easy_attribute_definition
       @easy_attribute_definitions ||= {}
       opt = args.last.is_a?(Hash) ? args.op : {}
 
@@ -923,6 +935,7 @@ module EasyAttributes
     #
     # Returns nothing
     def attr_fixed(*args)
+      define_easy_attribute_definition
       @easy_attribute_definitions ||= {}
       opt = args.last.is_a?(Hash) ? args.pop : {}
       suffix = opt.fetch(:method_suffix) { 'fixed' }
@@ -976,6 +989,11 @@ module EasyAttributes
       opt = {method_suffix:'money', precision:2}.merge(opt)
       args << opt
       attr_fixed(*args)
+    end
+
+    def attr_dollars(*args)
+      opt = args.last.is_a?(Hash) ? args.pop : {}
+      attr_money(*args, opt.merge(method_suffix:'dollars'))
     end
 
   end # EasyAttributes::ClassMethods

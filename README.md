@@ -176,13 +176,27 @@ m.bandwidth_bytes              #=> 1024
 m2.bandwidth_bytes(:MiB, precision:0) #=> "123 MB"
 ```
 
-## attr_money
+## attr_money, attr_dollars
+
+Adds helper methods to edit money values stored as fixed-precision
+integers (defaults to a stored value of 100 as "1.00" dollars).
+
+Created suffix methods 
+ * x_money() - returns a string of "dollar" amount: "123.00"
+ * x_money=() - Takes a string like "123.00" and sets x to 12300
+
+The _money suffix can be overriden by the method_suffix:"unit" option.
+
+The attr_dollars method defines the money attribute with a "dollars" suffix.
 
 ```ruby
 attr_money :amount       #=> use amount_money to get/set
-attr_money :quatloos, :units=>'quatloos', :precision=>3,
+                         #=> amount_money(), amount_money=()
+addr_dollars :amount     #=> amount_dollars(), amount_dollars=()
+attr_money :quatloos, :method_suffix=>'quatloos', :precision=>3,
     :zero=>'even', :nil=>'no bet', :negative=>'%.3f Loss', :unit=>'Q',
     :negative_regex=>/^(-?)(.+\d)\s*Loss/i
+                         #=> amount_quatloos(), amount_quatloos=()
 ```
 
 ## attr_fixed

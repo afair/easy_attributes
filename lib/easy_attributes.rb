@@ -820,7 +820,7 @@ module EasyAttributes
       # Define Constants Model::ATTRIBUTE_SYMBOL = value
       if Config::constantize
         easy_attribute_definition(attribute).symbols.each do |sym, value|
-          puts("#{attribute.upcase}_#{sym.to_s.upcase}= #{value}")
+          #puts("#{attribute.upcase}_#{sym.to_s.upcase}= #{value}")
           const_set("#{attribute.upcase}_#{sym.to_s.upcase}", value)
         end
       end

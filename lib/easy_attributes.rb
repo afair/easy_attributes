@@ -528,6 +528,14 @@ module EasyAttributes
       @orm
     end
 
+    # Directive to create constants from field value names: FIELD_NAME_VALUE_NAME=value
+    def self.constantize=(b)
+      @constantize = b ? true : false
+    end
+
+    def self.constantize
+      @constantize || false
+    end
   end
 
   # Private Module: FixedPoint handles integer<->fixed-point numbers
@@ -755,6 +763,8 @@ module EasyAttributes
     #   <attribute>_in()
     #   <attribute>_cmp()
     #
+    # If Config.constantize, create ATTRIBUTE_SYMBOL=value constants
+    #
     def easy_attribute_accessors(attribute, defn)
       #puts "easy_attribute_accessors(#{attribute}, #{defn})"
       attribute = attribute.to_sym
@@ -804,6 +814,14 @@ module EasyAttributes
           else
             raise "#{attribute} symbolic name #{sym} not found" 
           end
+        end
+      end
+
+      # Define Constants Model::ATTRIBUTE_SYMBOL = value
+      if Config::constantize
+        easy_attribute_definition(attribute).symbols.each do |sym, value|
+          puts("#{attribute.upcase}_#{sym.to_s.upcase}= #{value}")
+          const_set("#{attribute.upcase}_#{sym.to_s.upcase}", value)
         end
       end
 

@@ -73,6 +73,22 @@ EasyAttributes::Config.kb_size =
 Electrotechnical Commission)
   * :old, :jedec, 1024 - Uses the older 1024-byte KB definition (Joint Electron Devices Engineering Council)
 
+If you used earlier versions of this gem and depended upon constants
+being set on the model class, or if you think this would be fun to have,
+enable the constantize setting. This creates a constant for each 
+"ATTRIBUTE_SYMBOL=value" you define.
+
+```ruby
+EasyAttributes::Config.constantize = true
+
+class Participant
+  attr_values :status, living:1, dead:2
+end
+
+Participant::STATUS_LIVING  #=> 1
+
+```
+
 ## attr_values
 
 The `attr_values` declaration creates helpers to map symbolic names to
@@ -185,7 +201,7 @@ Created suffix methods
  * x_money() - returns a string of "dollar" amount: "123.00"
  * x_money=() - Takes a string like "123.00" and sets x to 12300
 
-The _money suffix can be overriden by the method_suffix:"unit" option.
+The _money suffix can be overridden by the method_suffix:"unit" option.
 
 The attr_dollars method defines the money attribute with a "dollars" suffix.
 

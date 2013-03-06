@@ -1,5 +1,6 @@
 require 'helper'
 EasyAttributes::Config.orm = :attr
+EasyAttributes::Config.constantize = true
 EasyAttributes::Definition.find_or_create(:status, {forsale:1, contract:2, sold:3})
 EasyAttributes::Definition.find_or_create(:status).add_symbol(:deleted, 9)
 
@@ -152,6 +153,10 @@ class TestEasyAttributes < Test::Unit::TestCase
     assert EasyAttributes::FixedPoint.format_fixed_point(-12345) == '-123.45'
     assert EasyAttributes::FixedPoint.format_fixed_point(-12345, "%07.1m") == '-000123.4'
     assert EasyAttributes::FixedPoint.format_fixed_point(-1) == '-0.01'
+  end
+
+  def test_constanize
+    assert TestEasyAttributes::STATUS_FORSALE == 1
   end
 
 end

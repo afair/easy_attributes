@@ -4,7 +4,9 @@ EasyAttributes::Config.constantize = true
 EasyAttributes::Definition.find_or_create(:status, {forsale:1, contract:2, sold:3})
 EasyAttributes::Definition.find_or_create(:status).add_symbol(:deleted, 9)
 
-class TestEasyAttributes < Test::Unit::TestCase
+# MiniTest::Unit::TestCase is now Minitest::Test. but this works on ruby 2.0
+# and ruby 2.1 for now.  Minitest::Test does not work in Ruby 2.0. Halp? :-(
+class TestEasyAttributes < MiniTest::Unit::TestCase
   include EasyAttributes
   attr_enum   :tas, :n1, :n2, nil, :n4, 8, :n8
   attr_values :tav, :k1=>1, :k2=>2, :k3=>3

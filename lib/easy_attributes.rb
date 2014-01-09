@@ -77,6 +77,7 @@ module EasyAttributes
       unless @attributes.has_key?(attribute)
         @attributes[attribute] = Definition.new(attribute, *definition)
       end
+      puts @attributes[attribute].inspect if attribute == :profile
       @attributes[attribute]
     end
 

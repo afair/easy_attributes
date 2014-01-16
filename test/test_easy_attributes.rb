@@ -81,7 +81,7 @@ class TestEasyAttributes < MiniTest::Unit::TestCase
 
   def test_method_money
     s = Sample.new
-    [ 10000, 123456, 0, -1 -9876 ].each do |p|
+    [ 10000, 123456, 0, -1, -9876 ].each do |p|
       s.price = p
       m = s.price_money
       s.price_money = m

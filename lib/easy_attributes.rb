@@ -77,7 +77,6 @@ module EasyAttributes
       unless @attributes.has_key?(attribute)
         @attributes[attribute] = Definition.new(attribute, *definition)
       end
-      puts @attributes[attribute].inspect if attribute == :profile
       @attributes[attribute]
     end
 
@@ -120,7 +119,8 @@ module EasyAttributes
     #   definition.define(:active, :inactive)
     #
     def define(*args)
-      return define_enum(*args) unless args.first.is_a?(Hash)
+      return if args.first.nil?
+      return define_enum(*args) if args.first.is_a?(Array)
 
       #symbols = Hash[* args.first.collect {|k,v| [k.to_sym, v]}.flatten]
       symbols = {}
@@ -182,9 +182,9 @@ module EasyAttributes
     #   definition.define_enum(:active, :inactive, start:1, step:10)
     #   definition.define_enum(:active, 11, :retired, nil, :inactive)
     #
-    def define_enum(*args)
-      opt = {step:1}.merge(args.last.is_a?(Hash) ? args.pop : {})
-      opt[:start] ||= (self.values.keys.max||0) + opt[:step]
+    def define_enum(args, opt={})
+      opt = {step:1}.merge(opt)
+      opt[:start] ||= self.values.keys.max ? self.values.keys.max + opt[:step] : Config.enum_start
       hash = {}
       i = opt[:start]
       args.each do |arg|
@@ -417,7 +417,7 @@ module EasyAttributes
         unit = ($1.size==2 ? $1.upcase : $1[0,1].upcase+$1[1,1]+$1[2,1].upcase).to_sym
         units = Definition.byte_units(opt[:kb_size]||Config.kb_size||1000)
         units = Definition.byte_units(:both) unless units.has_key?(unit)
-        puts "parse_bytes(#{v}) unit=#{unit} b=#{bytes} * #{units[unit]}"
+        #puts "parse_bytes(#{v}) unit=#{unit} b=#{bytes} * #{units[unit]}"
         bytes *= units[unit] if units.has_key?(unit)
       end
       (bytes*100 + 0.00001).to_i/100
@@ -536,6 +536,15 @@ module EasyAttributes
 
     def self.constantize
       @constantize || false
+    end
+
+    # Starting point for enum sequences (usually 0 or 1)
+    def self.enum_start
+      @enum_start || 1
+    end
+
+    def self.enum_start=(n)
+      @enum_start = n
     end
   end
 
@@ -727,7 +736,8 @@ module EasyAttributes
     #
     # Returns nothing
     def attr_enum(attribute, *args)
-      defn = Definition.find_or_create(attribute, *args)
+      opt = args.last.is_a?(Hash) ? args.pop : {}
+      defn = Definition.find_or_create(attribute, args, opt)
       easy_attribute_accessors(attribute, defn)
     end
 

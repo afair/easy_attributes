@@ -786,7 +786,7 @@ module EasyAttributes
       code = ''
 
       if EasyAttributes::Config.orm == :active_model || opt[:orm] == :active_model
-        validates_inclusion_of attribute, :in=>defn.symbols.values
+        self.validates_inclusion_of attribute, :in=>defn.symbols.values
         # Add named_scope (scope) for each value
         if opt[:named_scope]
           defn.symbols.each { |k,v| code += "named_scope :#{k}, :conditions=>{:#{attribute}=>#{v.inspect}}\n" }

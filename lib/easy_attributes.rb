@@ -187,7 +187,7 @@ module EasyAttributes
       opt[:start] ||= self.values.keys.max ? self.values.keys.max + opt[:step] : Config.enum_start
       hash = {}
       i = opt[:start]
-      args.each do |arg|
+      args.flatten.each do |arg|
         if arg.is_a?(Symbol) || arg.nil?
           hash[arg] = i unless arg.nil?
           opt[:step].times {i = i.next}

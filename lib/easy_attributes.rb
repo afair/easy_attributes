@@ -704,7 +704,8 @@ module EasyAttributes
     #
     # Returns nothing
     def attr_values(attribute, *args)
-      defn = Definition.find_or_create(attribute, *args)
+      #defn = Definition.find_or_create(attribute, *args)
+      defn = Definition.new(attribute, *args)
       easy_attribute_accessors(attribute, defn)
     end
 
@@ -737,7 +738,8 @@ module EasyAttributes
     # Returns nothing
     def attr_enum(attribute, *args)
       opt = args.last.is_a?(Hash) ? args.pop : {}
-      defn = Definition.find_or_create(attribute, args, opt)
+      #defn = Definition.find_or_create(attribute, args, opt)
+      defn = Definition.new(attribute, args, opt)
       easy_attribute_accessors(attribute, defn)
     end
 
@@ -777,11 +779,9 @@ module EasyAttributes
     # If Config.constantize, create ATTRIBUTE_SYMBOL=value constants
     #
     def easy_attribute_accessors(attribute, defn)
-      #puts "easy_attribute_accessors(#{attribute}, #{defn})"
       attribute = attribute.to_sym
       @easy_attribute_definitions ||= {}
       @easy_attribute_definitions[attribute] = defn
-      #name = "#{self.name}##{attribute}"
       opt = defn.options
       code = ''
 
@@ -813,12 +813,12 @@ module EasyAttributes
 
       # <attribute>_options() Returns an array of (HTML Select) option pairs
       # => [["Option Name", :symbol], ...]
-      define_singleton_method("#{attribute}_options") do |*args|
+      self.define_singleton_method("#{attribute}_options") do |*args|
         easy_attribute_definition(attribute).select_option_symbols(*args)
       end
 
       # <attribute>_of(:sym [,:default_sym]) Returns the symbol/value hash for the attribute
-      define_singleton_method("#{attribute}_of") do |*args, &block|
+      self.define_singleton_method("#{attribute}_of") do |*args, &block|
         easy_attribute_definition(attribute).symbols.fetch(args.first.to_sym) do |sym| 
           if args.size>1
             easy_attribute_definition(attribute).symbols.fetch(args[1].to_sym, &block)
@@ -918,7 +918,8 @@ module EasyAttributes
         unless EasyAttributes::Config.orm == :active_model || opt[:orm] == :active_model
           attr_accessor attribute if EasyAttributes::Config.orm == :attr
         end
-        defn = Definition.find_or_create(attribute, {}, opt)
+        #defn = Definition.find_or_create(attribute, {}, opt)
+        defn = Definition.new(attribute, {}, opt)
         @easy_attribute_definitions[attribute] = defn
 
         # <attribute>_bytes()
@@ -974,7 +975,8 @@ module EasyAttributes
         unless EasyAttributes::Config.orm == :active_model || opt[:orm] == :active_model
           attr_accessor attribute if EasyAttributes::Config.orm == :attr
         end
-        defn = Definition.find_or_create(attribute, {}, opt)
+        #defn = Definition.find_or_create(attribute, {}, opt)
+        defn = Definition.new(attribute, {}, opt)
         @easy_attribute_definitions[attribute] = defn
 
         # <attribute>_fixed()

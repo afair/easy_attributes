@@ -81,11 +81,15 @@ module EasyAttributes
     end
 
     def to_s
-      "<#EasyAttributes::Definition #{@attribute} #{@symbols}>"
+      "<#EasyAttributes::Definition #{@attribute} #{@symbols.inspect}>"
     end
 
     def self.definitions
       @attributes
+    end
+
+    def self.shared(attribute, *definition)
+      find_or_create(attribute, *definition)
     end
 
     # Public: Creates a new Definition for the attribute and definition list
@@ -93,7 +97,7 @@ module EasyAttributes
     #
     # Examples
     #
-    #   Definition.find_or_create(:status, active:1, inactive:2)
+    #   Definition.new(:status, active:1, inactive:2)
     #
     # Returns the new instance
     def initialize(attribute, *definition)
@@ -122,7 +126,6 @@ module EasyAttributes
       return if args.first.nil?
       return define_enum(*args) if args.first.is_a?(Array)
 
-      #symbols = Hash[* args.first.collect {|k,v| [k.to_sym, v]}.flatten]
       symbols = {}
       options = {}
       args.first.each do |k,v|
@@ -137,7 +140,6 @@ module EasyAttributes
       self.symbols.merge!(symbols)
       self.values = Hash[* self.symbols.collect {|k,v| [v, k]}.flatten]
       self.attr_options.merge!(options)
-      #puts "DEFINED #{@attribute} #{self.symbols.inspect}"
     end
 
     # Public: Defines an Symbol/Value for the attribute
@@ -369,19 +371,15 @@ module EasyAttributes
     # Returns a string like "n.nn XB" representing the approximate bytes
     #
     def format_bytes(v, *args)
-      #puts "&format_bytes(#{v},#{args.inspect})"
-      #units = EasyAttributes.byte_units(opt[:kb_size]||EasyAttributes::Config.kb_size||0)
       opt = args.last.is_a?(Hash) ? args.pop : {}
       opt = attr_options.merge(opt)
       unit = args.shift
       units = Definition.byte_units(opt[:kb_size]||Config.kb_size||1000)
       precision = opt[:precision] || attr_options[:precision] || 0
-      #vint = v
 
       if unit
         units = Definition.byte_units() unless units.has_key?(unit)
         v = "%.#{precision}f" % (1.0 * v / (units[unit]||1))
-        #puts "format_bytes(#{vint},#{unit},#{precision}) => #{v} #{unit}"
         return "#{v} #{unit}"
       end
 
@@ -389,7 +387,6 @@ module EasyAttributes
         next if pv[1] > v
         v = "%.#{precision}f" % (1.0 * v / pv[1])
         v.gsub!(/\.0*$/, '')
-        #puts "format_bytes(#{vint}) v=#{v}, p=#{precision}, #{pv.inspect}"
         return "#{v} #{pv[0]}"
       end
       v.to_s
@@ -417,7 +414,6 @@ module EasyAttributes
         unit = ($1.size==2 ? $1.upcase : $1[0,1].upcase+$1[1,1]+$1[2,1].upcase).to_sym
         units = Definition.byte_units(opt[:kb_size]||Config.kb_size||1000)
         units = Definition.byte_units(:both) unless units.has_key?(unit)
-        #puts "parse_bytes(#{v}) unit=#{unit} b=#{bytes} * #{units[unit]}"
         bytes *= units[unit] if units.has_key?(unit)
       end
       (bytes*100 + 0.00001).to_i/100
@@ -673,7 +669,7 @@ module EasyAttributes
   #     include EasyAttributes
   #     attr_values  :attr, name:value, ...
   #     attr_enum    :attr, :name, ....
-  #     attr_defined :attr, :attr=>:defined_attr
+  #     attr_define  :attr, :attr=>:defined_attr
   #     attr_bytes   :attr, ..., :base=>2
   #     attr_money   :attr, :precision=>2
   #     attr_fixed   :attr, :precision=>2
@@ -738,17 +734,31 @@ module EasyAttributes
     # Returns nothing
     def attr_enum(attribute, *args)
       opt = args.last.is_a?(Hash) ? args.pop : {}
-      #defn = Definition.find_or_create(attribute, args, opt)
       defn = Definition.new(attribute, args, opt)
       easy_attribute_accessors(attribute, defn)
     end
 
-    # Public: Imports global definitions into the class by attribute name or Hash mapping.
+    # Public: Sets global definitions into the class by attribute name or Hash mapping.
     #
     # attributes - List of attributes to import from Config definitions
     # mappings   - Hash of atttribute names to a matching alternate name in the Config definitions
     #
-    # Exanples
+    # Examples (call like attr_values or attr_enum)
+    #
+    #   attr_define :status, :signup, :confirm, :unreachable, :delete
+    #   attr_define :status, signup:1, confirm:2, uncreachable:3, delete:4
+    #
+    # Stores the definition in a symbol table for later attr_shared lookup
+    def attr_define(attribute, *definition)
+      find_or_create(attribute, *definition)
+    end
+
+    # Public: Imports previously defined definitions into the class by attribute name or Hash mapping.
+    #
+    # attributes - List of attributes to import from Config definitions
+    # mappings   - Hash of atttribute names to a matching alternate name in the Config definitions
+    #
+    # Examples
     #
     #   attr_shared :status, :role, widget_type: :general_type, colname: :sharedname
     #   attr_shared employee_status:Employee.status_definition()
@@ -756,15 +766,14 @@ module EasyAttributes
     # Calls attr_values with each definition
     def attr_shared(*attributes)
       mapping = attributes.last.is_a?(Hash) ? attributes.pop : {}
-      attributes.each { |attribute| attr_values(attribute) }
-      mapping.each do |attribute,alternate_name|
-        defn = if alternate_name.is_a?(Definition)
-                   alternate_name
-                 else
-                   Definition.find_or_create(alternate_name)
-                 end
-        easy_attribute_accessors(attribute, defn)
-      end
+      attributes.each { |a| install_shared_attribute(a) }
+      mapping.each { |a, shared| install_shared_attribute(a, shared) }
+    end
+
+    def install_shared_attribute(name, shared_name=nil)
+      shared_name ||= name
+      defn = Definition.find_or_create(shared_name)
+      easy_attribute_accessors(name, defn)
     end
 
     # Private: Creates attribute accessors for the attribute /definition for attr_values
@@ -803,13 +812,6 @@ module EasyAttributes
       #------------------------------------------------------------------------
 
       define_easy_attribute_definition
-      # # Adds once to class: Returns the EasyAttribute::Definition of the passed
-      # # Easy Attribute name
-      # unless self.respond_to?(:easy_attribute_definition)
-      #   define_singleton_method(:easy_attribute_definition) do |attrib|
-      #     @easy_attribute_definitions.fetch(attrib.to_sym) { raise "EasyAttribute #{attrib} not found" }
-      #   end
-      # end
 
       # <attribute>_options() Returns an array of (HTML Select) option pairs
       # => [["Option Name", :symbol], ...]
@@ -831,7 +833,6 @@ module EasyAttributes
       # Define Constants Model::ATTRIBUTE_SYMBOL = value
       if Config::constantize
         easy_attribute_definition(attribute).symbols.each do |sym, value|
-          #puts("#{attribute.upcase}_#{sym.to_s.upcase}= #{value}")
           const_set("#{attribute.upcase}_#{sym.to_s.upcase}", value)
         end
       end
@@ -869,17 +870,6 @@ module EasyAttributes
       define_method("#{attribute}_cmp") do |other|
         self.class.easy_attribute_definition(attribute).cmp(self.send(attribute),other)
       end
-
-      ## <attribute>_value()
-      ## Experimental for the EasyAttributes::Value class, getter and setter methods
-      #define_method("#{attribute}_value") do
-      #  self.class.easy_attribute_definition(attribute).value(self.send(attribute))
-      #end
-
-      ## <attribute>value=(new_value_object)
-      #define_method("#{attribute}_value=") do |v|
-      #  self.send("#{attribute}=", self.class.easy_attribute_definition(attribute).value(v))
-      #end
     end
 
     # Adds once to class: Returns the EasyAttribute::Definition of the passed
@@ -975,7 +965,6 @@ module EasyAttributes
         unless EasyAttributes::Config.orm == :active_model || opt[:orm] == :active_model
           attr_accessor attribute if EasyAttributes::Config.orm == :attr
         end
-        #defn = Definition.find_or_create(attribute, {}, opt)
         defn = Definition.new(attribute, {}, opt)
         @easy_attribute_definitions[attribute] = defn
 

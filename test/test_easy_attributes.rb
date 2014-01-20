@@ -1,8 +1,8 @@
 require 'helper'
 EasyAttributes::Config.orm = :attr
 EasyAttributes::Config.constantize = true
-EasyAttributes::Definition.find_or_create(:status, {forsale:1, contract:2, sold:3})
-EasyAttributes::Definition.find_or_create(:status).add_symbol(:deleted, 9)
+EasyAttributes::Definition.shared(:status, {forsale:1, contract:2, sold:3})
+EasyAttributes::Definition.shared(:status).add_symbol(:deleted, 9)
 
 # MiniTest::Unit::TestCase is now Minitest::Test. but this works on ruby 2.0
 # and ruby 2.1 for now.  Minitest::Test does not work in Ruby 2.0. Halp? :-(
@@ -157,7 +157,7 @@ class TestEasyAttributes < MiniTest::Unit::TestCase
     assert EasyAttributes::FixedPoint.format_fixed_point(-1) == '-0.01'
   end
 
-  def test_constanize
+  def test_constantize
     assert TestEasyAttributes::STATUS_FORSALE == 1
   end
 

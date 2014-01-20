@@ -1,6 +1,7 @@
 # EasyAttributes: Model Attribute Definition Helpers
+[![Gem Version](https://badge.fury.io/rb/easy_attributes.png)](http://badge.fury.io/rb/easy_attributes)
 
-The EasyAttributes ruby gem extends ruby classes with an attribute helper
+The **EasyAttributes** ruby gem extends ruby classes with an attribute helper
 DSL to declare attributes as:
 
   * Enumerated with symbolic names
@@ -73,6 +74,8 @@ EasyAttributes::Config.kb_size =
 Electrotechnical Commission)
   * :old, :jedec, 1024 - Uses the older 1024-byte KB definition (Joint Electron Devices Engineering Council)
 
+### Value Constants
+
 If you used earlier versions of this gem and depended upon constants
 being set on the model class, or if you think this would be fun to have,
 enable the constantize setting. This creates a constant for each 
@@ -86,67 +89,58 @@ class Participant
 end
 
 Participant::STATUS_LIVING  #=> 1
-
 ```
 
 ## attr_values
 
-The `attr_values` declaration creates helpers to map symbolic names to
-the allowed values of the attribute. For example, assume we are working
-with a (legacy?) database table with a `status` column of type integer
-with maps values to a user status. We declare the status attribute and
-code with symbol names instead of numbers.
+The `attr_values` declaration creates a shadow attribute name that works
+with symbol names instead of the actual values.
 
 ```ruby
 class User < ActiveRecord::Base
   include EasyAttributes
   attr_values :status, signup:1, verified:2, expired:3, disabled:4
 end
+
+User.easy_attribute_definition(:status).symbols
+  #=> {signup:1, verified:2, expired:3, disabled:4}
+User.easy_attribute_definition(:status).values
+  #=> {1=>:signup, 2=>:verified, 3=>:expired, 4=>:disabled}
+User.status_of(:expired)      #=> 3
+
+user = User.new(status_sym: :signup)
+user.status                   #=> 1
+user.status_sym               #=> :signup
+user.status_sym = :verified   #=> :verified
+user.status                   #=> 2
+user.status_in(:verified)     #=> true
+user.status_cmp(:verified)    #=> 0
+
+<% form_for user do |f| %>
+  <%= f.select :status, User.status_options %>
+<% end %>
 ```
 
-This creates a few helper methods:
- * Class Methods
-   * User.status_of(symbol) - Returns matching value for symbol
-   * User.status_options() - Returns [[name,value],...] pairs for HTML
+The above status definition creates the following:
+
+  * Class Methods
+    * User.status_of(symbol) - Returns matching value for symbol
+    * User.status_options() - Returns [[name,value],...] pairs for HTML
 options.
- * status_sym - returns a symbol matching the value of status()
- * status_sym=(symbol) - Sets status to the coorresponding value of
-`symbol`
- * status_in(*symbols) - Boolean match if symbols.include?(status_sym)
- * status_cmp(symbol) - implements the <=> (`cmp`) method on status
-   * Returns -1 if status < User.status_of(symbol)
-   * Returns  0 if status == User.status_of(symbol)
-   * Returns 1 if status > User.status_of(symbol)
+  * status_sym - returns a symbol matching the value of status()
+  * status_sym=(symbol) - Sets status to the value of symbol
+  * status_in(*symbols) - Boolean match if symbols.include?(status_sym)
+  * status_cmp(symbol) - implements the <=> (`cmp`) method on status
+    * Returns -1 if status < User.status_of(symbol)
+    * Returns  0 if status == User.status_of(symbol)
+    * Returns 1 if status > User.status_of(symbol)
+    * 
+### Validations
 
 If your orm is set to :active_model, attr_values will set up
 ```ruby
 validates_inclusion_of :status, 
   in: Subscriber.easy_attribute_definition(:status).values.keys
-```
-
-Here are some usage examples:
-
-```ruby
-user.status                         #=> 1
-user.status_sym = :verified         #=> :verified
-user.status                         #=> 2
-user.status_sym == :verified        #=> true
-user.status_in(:expired, :disabled) #=> false
-user.status_cmp(:expired)           #=> 1
-user.valid?                         #=> true
-user.status_sym = :wrong            #=> nil
-user.valid?                         #=> false
-
-User.status_of(:expired)            #=> 3
-User.status_options                 #=> [["Signup", 1],...]
-```
-
-You can use this to generate the HTML <option> elements for a <select>
-control for your field:
-
-```ruby
-f.input :status, collection:User.status_options
-options_for_select(User.status_options, user.status)
 ```
 
 ## attr_enum
@@ -176,11 +170,29 @@ Another example:
 attr_enum :month, 1, :jan, 5, :apr, :may, nil, :jul, ..., :start=>1, :step=>1
 ```
 
-## attr_shared
+## attr_define / attr_shared
+
+Attribute definitions can be shared among classes. Use the `attr_define`
+method to store the definition in the easy attribute symbol table, and
+use the `attr_shared` method to use those previously defined. 
 
 ```ruby
-attr_shared :status, :my_rule=>:shared_rule
+attr_define :status, signup:1, verified:2, expired:3, disabled:4
+attr_define :shared_rule, :first, :second, :third
+
+class User
+  attr_shared :status, :my_rule=>:shared_rule
+end
 ```
+
+This imports the definition for "status" defined earlier, and imports
+the "shared_rule" definition using "my_rule" as it's local attribute.
+
+Because of
+the load order of classes, you must first set up your global definitions
+before loading your application classes. For Rails, the best way to do
+this is to create a `config/initiailizers/easy_attributes.rb` file with
+the application-global definitions.
 
 ## attr_bytes
 
@@ -211,7 +223,7 @@ attr_money :amount       #=> use amount_money to get/set
 addr_dollars :amount     #=> amount_dollars(), amount_dollars=()
 attr_money :quatloos, :method_suffix=>'quatloos', :precision=>3,
     :zero=>'even', :nil=>'no bet', :negative=>'%.3f Loss', :unit=>'Q',
-    :negative_regex=>/^(-?)(.+\d)\s*Loss/i
+    :negative_regex=>/\A(-?)(.+\d)\s*Loss/i
                          #=> amount_quatloos(), amount_quatloos=()
 ```
 

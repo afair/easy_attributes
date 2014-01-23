@@ -312,7 +312,7 @@ module EasyAttributes
           return @attr_options[s][f] if @attr_options[s].has_key?(f)
         end
       end
-      s.to_s.capitalize
+      s.to_s.capitalize.gsub(/_/, ' ')
     end
 
     # Defines each() for Enumerable
@@ -371,6 +371,7 @@ module EasyAttributes
     # Returns a string like "n.nn XB" representing the approximate bytes
     #
     def format_bytes(v, *args)
+      return v if v.nil?
       opt = args.last.is_a?(Hash) ? args.pop : {}
       opt = attr_options.merge(opt)
       unit = args.shift

@@ -739,6 +739,26 @@ module EasyAttributes
       easy_attribute_accessors(attribute, defn)
     end
 
+    # Public: Defines an attribute as a set of values. For String-type attributes
+    #
+    # attribute - symbolic name of the attribute
+    # args      - a list of allowed string names (symbols can be used for convenience as well)
+    #
+    # Examples
+    #
+    #   attr_allowed :type, "mammal", :bird, :insect
+    #
+    # Creates the same methods as attr_values().
+    #
+    # Returns nothing
+    def attr_allowed(attribute, *args)
+      opt = args.last.is_a?(Hash) ? args.pop : {}
+      vals = {}
+      args.flatten.map { |v| vals[v.to_sym] = v.to_s }
+      defn = Definition.new(attribute, vals, opt)
+      easy_attribute_accessors(attribute, defn)
+    end
+
     # Public: Sets global definitions into the class by attribute name or Hash mapping.
     #
     # attributes - List of attributes to import from Config definitions

@@ -13,6 +13,7 @@ class TestEasyAttributes < MiniTest::Unit::TestCase
   attr_shared :status, status1: :status
   attr_bytes  :bw
   attr_money  :amount
+  attr_allowed :type, %w(mammal insect amphibian)
 
   def test_definitions
     EasyAttributes::Definition.find_or_create(:role, {admin:'a', moderator:'m', user:'u'})
@@ -34,6 +35,12 @@ class TestEasyAttributes < MiniTest::Unit::TestCase
     assert_equal tav_sym, :k2
     assert_equal tav_in(:k2), true
     assert_equal tav_in(:k1, :k3), false
+  end
+
+  def test_attr_allowed
+    self.type_sym = :mammal
+    assert_equal type, "mammal"
+    assert_equal type_sym, :mammal
   end
 
   def test_attr_shared

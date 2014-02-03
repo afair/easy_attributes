@@ -170,6 +170,21 @@ Another example:
 attr_enum :month, 1, :jan, 5, :apr, :may, nil, :jul, ..., :start=>1, :step=>1
 ```
 
+## attr_allowed
+
+Defines a list of allowed string values for the attribute, and these values can
+be access as either string or symbol values. The advantage here is the
+generated "options" and validation.
+
+```ruby
+attr_allowed :type, %w(string integer range datetime)
+
+d = DataType.new
+d.type_sym = :string
+d.type                  #=> "string"
+d.type = "range"
+```
+
 ## attr_define / attr_shared
 
 Attribute definitions can be shared among classes. Use the `attr_define`

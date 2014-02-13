@@ -815,7 +815,8 @@ module EasyAttributes
       opt = defn.options
       code = ''
 
-      if EasyAttributes::Config.orm == :active_model || opt[:orm] == :active_model
+      if (EasyAttributes::Config.orm == :active_model || opt[:orm] == :active_model) &&
+          self.respond_to?(:validates_inclusion_of)
         self.validates_inclusion_of attribute, :in=>defn.symbols.values
         # Add named_scope (scope) for each value
         if opt[:named_scope]

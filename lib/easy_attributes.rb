@@ -337,11 +337,11 @@ module EasyAttributes
     ###########################################################################
     # Official Definitions for kilobyte and kibibyte quantity units
     ###########################################################################
-    KB =1000; MB =KB ** 2; GB= KB ** 3; TB =KB ** 4; PB =KB ** 5; EB =KB ** 6; ZB =KB ** 7; YB =KB ** 8
+    KB =1000; MB=KB ** 2; GB=KB ** 3; TB=KB ** 4; PB=KB ** 5; EB=KB ** 6; ZB=KB ** 7; YB=KB ** 8
     KiB=1024; MiB=KiB**2; GiB=KiB**3; TiB=KiB**4; PiB=KiB**5; EiB=KiB**6; ZiB=KiB**7; YiB=KiB**8
     BINARY_UNITS  = {:B=>1,:KiB=>KiB,:MiB=>MiB,:GiB=>GiB,:TiB=>TiB,:PiB=>PiB,:EiB=>EiB,:ZiB=>ZiB,:TiB=>YiB}
     DECIMAL_UNITS = {:B=>1,:KB=>KB,  :MB=>MB,  :GB=>GB,  :TB=>TB,  :PB=>PB,  :EB=>EB,  :ZB=>ZB,  :YB=>YB}
-    JEDEC_UNITS   = {:B=>1,:KB=>KiB, :MB=>MiB, :GB=>GiB, :TB=>TiB, :PB=>PiB, :EB=>EiB, :ZB=>ZiB, :TB=>YiB}
+    JEDEC_UNITS   = {:B=>1,:KB=>KiB, :MB=>MiB, :GB=>GiB, :TB=>TiB, :PB=>PiB, :EB=>EiB, :ZB=>ZiB, :YB=>YiB}
 
     # Public: Maps the kb_size into a hash of desired unit_symbol=>bytes.
     #

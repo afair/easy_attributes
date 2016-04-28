@@ -1,9 +1,13 @@
-require 'rubygems'
-require 'minitest/autorun'
-
-$LOAD_PATH.unshift(File.dirname(__FILE__))
-$LOAD_PATH.unshift(File.join(File.dirname(__FILE__), '..', 'lib'))
+$LOAD_PATH.unshift File.expand_path('../../lib', __FILE__)
 require 'easy_attributes'
+
+require 'minitest/autorun'
+#require 'rubygems'
+#require 'minitest/autorun'
+#
+#$LOAD_PATH.unshift(File.dirname(__FILE__))
+#$LOAD_PATH.unshift(File.join(File.dirname(__FILE__), '..', 'lib'))
+#require 'easy_attributes'
 
 EasyAttributes::Definition.find_or_create(:status, {forsale:1, contract:2, sold:3})
 EasyAttributes::Definition.find_or_create(:status).add_symbol(:deleted, 9)

@@ -1,3 +1,5 @@
+require "easy_attributes/version"
+
 ###############################################################################
 # EasyAttributes Module - Provides attribute handling enahancements.
 #

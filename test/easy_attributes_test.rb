@@ -1,12 +1,11 @@
-require 'helper'
+require 'test_helper'
+
 EasyAttributes::Config.orm = :attr
 EasyAttributes::Config.constantize = true
 EasyAttributes::Definition.shared(:status, {forsale:1, contract:2, sold:3})
 EasyAttributes::Definition.shared(:status).add_symbol(:deleted, 9)
 
-# MiniTest::Unit::TestCase is now Minitest::Test. but this works on ruby 2.0
-# and ruby 2.1 for now.  Minitest::Test does not work in Ruby 2.0. Halp? :-(
-class TestEasyAttributes < MiniTest::Unit::TestCase
+class EasyAttributesTest < Minitest::Test
   include EasyAttributes
   attr_enum   :tas, :n1, :n2, nil, :n4, 8, :n8
   attr_values :tav, :k1=>1, :k2=>2, :k3=>3
@@ -23,8 +22,8 @@ class TestEasyAttributes < MiniTest::Unit::TestCase
     self.tas_sym = :n1
     assert_equal self.tas, 1
     assert_equal self.tas_sym, :n1
-    assert_equal TestEasyAttributes.easy_attribute_definition(:tas).value_of(:n4), 4
-    assert_equal TestEasyAttributes.easy_attribute_definition(:tas).value_of(:n8), 8
+    assert_equal EasyAttributesTest.easy_attribute_definition(:tas).value_of(:n4), 4
+    assert_equal EasyAttributesTest.easy_attribute_definition(:tas).value_of(:n8), 8
   end
 
   def test_attr_values
@@ -165,7 +164,7 @@ class TestEasyAttributes < MiniTest::Unit::TestCase
   end
 
   def test_constantize
-    assert TestEasyAttributes::STATUS_FORSALE == 1
+    assert EasyAttributesTest::STATUS_FORSALE == 1
   end
 
 end
